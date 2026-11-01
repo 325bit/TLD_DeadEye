@@ -1,0 +1,69 @@
+using ModSettings;
+using UnityEngine;
+
+namespace DeadEye;
+
+/// <summary>
+/// Settings panel (Options > Mod Settings > Dead Eye). Persisted to Mods\TLD_DeadEye.json.
+/// Name/Description strings are in-game copy (Chinese by design).
+/// </summary>
+internal class Settings : JsonModSettings
+{
+    [Section("武器绑定")]
+
+    [Name("绑定的左轮手枪")]
+    [Description("只有这把左轮能触发死神之眼。进入标记模式前会检查背包与手上是否携带它，标记次数上限等于它的剩余装弹数。")]
+    [Choice("左轮手枪", "华贵左轮", "绿色左轮", "短管左轮")]
+    public int BoundRevolver = 0;
+
+    [Section("按键")]
+
+    [Name("进入 / 退出死神之眼")]
+    [Description("默认鼠标后侧键。点一下输入框再按想要的键即可重新绑定。")]
+    public KeyCode ToggleKey = KeyCode.Mouse3;
+
+    [Name("标记目标")]
+    [Description("默认鼠标中键。在子弹时间里瞄准一只活物并按下，即可把它标记为射击目标，可重复标记同一目标或标记多个目标。")]
+    public KeyCode MarkKey = KeyCode.Mouse2;
+
+    [Section("子弹时间")]
+
+    [Name("时间流速")]
+    [Description("进入标记模式后世界的时间流速。0.1 = 十分之一速，越小越慢。")]
+    [Slider(0.05f, 0.5f)]
+    public float TargetTimeScale = 0.1f;
+
+    [Name("进入渐变速度")]
+    [Description("进入标记模式时时间流速渐变到目标值的快慢，越大越快。")]
+    [Slider(0.5f, 5f)]
+    public float EnterLerpSpeed = 1f;
+
+    [Name("退出渐变速度")]
+    [Description("退出标记模式时时间流速恢复正常的快慢，越大越快。")]
+    [Slider(0.5f, 8f)]
+    public float ExitLerpSpeed = 3f;
+
+    [Section("体力消耗")]
+
+    [Name("疲劳消耗倍率")]
+    [Description("标记模式期间疲劳的额外消耗倍率。3 = 正常速率的三倍（在时间放缓后的实际游戏时间里按倍率折算），退出后恢复正常。")]
+    [Slider(1f, 10f)]
+    public float FatigueMultiplier = 3f;
+
+    [Section("视觉")]
+
+    [Name("黄色滤镜")]
+    [Description("标记模式期间画面叠加一层黄色滤镜，模拟《荒野大镖客2》的死神之眼观感。")]
+    public bool YellowOverlay = true;
+
+    [Name("滤镜不透明度")]
+    [Description("黄色滤镜的浓度，0 = 全透明（等于关闭滤镜）。")]
+    [Slider(0f, 0.6f)]
+    public float OverlayOpacity = 0.22f;
+
+    [Section("调试")]
+
+    [Name("输出详细日志")]
+    [Description("把进入 / 标记 / 开火序列等状态写进 MelonLoader 日志，排查问题时打开。")]
+    public bool Verbose = false;
+}

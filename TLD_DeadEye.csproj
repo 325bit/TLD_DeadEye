@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>Latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <DebugType>none</DebugType>
+    <AssemblyName>TLD_DeadEye</AssemblyName>
+    <RootNamespace>DeadEye</RootNamespace>
+    <!-- Live install; change this line when switching machines -->
+    <TheLongDarkPath>F:\GameAbouts\The Long Dark\TheLongDark_2.55</TheLongDarkPath>
+    <ReleaseFolderPath>$(MSBuildProjectDirectory)\Release</ReleaseFolderPath>
+  </PropertyGroup>
+
+  <!-- MelonLoader / HarmonyX / UnityEngine / Assembly-CSharp are provided transitively by the STBlade package -->
+  <ItemGroup>
+    <PackageReference Include="STBlade.Modding.TLD.Il2CppAssemblies.Windows" Version="2.55.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Game types live under the Il2Cpp / Il2CppTLD / Il2Cpp.TLD.* namespaces -->
+    <Using Include="Il2Cpp" />
+    <!-- Bind the live-install ModSettings.dll / ModData.dll, never copied to output -->
+    <Reference Include="ModSettings">
+      <HintPath>$(TheLongDarkPath)\Mods\ModSettings.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ModData">
+      <HintPath>$(TheLongDarkPath)\Mods\ModData.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(TheLongDarkPath)/Mods" Condition="Exists('$(TheLongDarkPath)/Mods')" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ReleaseFolderPath)" />
+  </Target>
+
+</Project>
