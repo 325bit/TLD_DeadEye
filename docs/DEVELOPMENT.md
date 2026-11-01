@@ -17,6 +17,7 @@ RDR2-style Dead Eye for The Long Dark 2.55: bullet-time marking mode plus a chai
 | `Core/GunResolver.cs` | Finds the bound revolver (hands first, then backpack) and reads its clip |
 | `Core/TimeScaler.cs` | Coroutine lerp of `Time.timeScale` + `GameManager.m_GlobalTimeScale` (TT-PauseOnRadial pattern) |
 | `Core/Ballistics.cs` | Muzzle-velocity table (AdaptiveArsenal values) + fixed-point intercept prediction for moving targets |
+| `Core/ModAudio.cs` | Loads the two WAV sound effects from `Mods/DeadEye/Asset` (hand-parsed RIFF/PCM16) and plays them through `winmm!PlaySound` |
 | `Ui/Overlay.cs` | Yellow Canvas filter + OnGUI markers and message line |
 | `Patches/Patches.cs` | `BulletStartPatch` (redirect spawned bullet onto the predicted intercept point, zero spread) and `FatiguePatch` (drain multiplier) |
 
@@ -91,7 +92,7 @@ Deliberately **not** patched: `vp_FPSShooter.Fire` (called directly — it alrea
 
 ## 8. Settings mapping
 
-Every entry in `Settings.cs` maps 1:1 to the README settings table (both language blocks). Defaults: time scale 0.1, enter lerp 1, exit lerp 3, fatigue x3, tint 0.22. Keybind defaults `Mouse3` (side) / `Mouse2` (middle) via the ModSettings key-capture widget; rebindable to any key or mouse button.
+Every entry in `Settings.cs` maps 1:1 to the README settings table (both language blocks). Defaults: time scale 0.1, enter lerp 1, exit lerp 3, fatigue x3, tint 0.22, sound volume 0.8. Keybind defaults `Mouse3` (side) / `Mouse2` (middle) via the ModSettings key-capture widget; rebindable to any key or mouse button.
 
 ## 9. Logging
 
@@ -145,9 +146,17 @@ cd TLD_DeadEye
 dotnet build -c Release
 ```
 
-The csproj post-build copies `TLD_DeadEye.dll` to the live install's `Mods/` folder (path defined once in `TLD_DeadEye.csproj`) and to `Release/`. Verify with the last lines of `MelonLoader/Latest.log`: the mod prints its version and the number of patched methods at startup.
+The csproj post-build copies `TLD_DeadEye.dll` to the live install's `Mods/` folder (path defined once in `TLD_DeadEye.csproj`) and to `Release/`, and copies `Asset/*.wav` to `Mods/DeadEye/Asset` / `Release/DeadEye/Asset` (see §15). Verify with the last lines of `MelonLoader/Latest.log`: the mod prints its version and the number of patched methods at startup.
 
-## 15. Maintenance rules
+## 15. Sound effects
+
+- Two PCM16 WAV files ship in `DeadEye/Asset/` (`dead-eye-rdr2.wav` = activation, ~12.6 s; `dead-eye-mark.wav` = mark confirm, ~0.75 s). The `.mp3` files next to them are the editable sources — re-run ffmpeg (`-acodec pcm_s16le`) after editing an mp3.
+- **Playback goes through `winmm!PlaySound`, NOT Unity audio.** Both Unity routes are dead in this IL2CPP build: `AudioClip.Create` + `SetData` returns an empty clip (length/frequency/channels all zero) and the `DownloadHandlerAudioClip` constructor is stripped (Method not found) — both proven in TLD_LanternBelt, which this module follows. Windows decodes the WAV itself, independent of the game's Wwise mix; the one PlaySound channel is process-wide, so a new sound interrupts the previous one (a mark confirm cuts the activation sound).
+- Volume (the `SoundVolume` setting, default 0.8) is applied by pre-scaling the samples into a cached `*_v.wav` sibling per source file, regenerated only when the volume changes — `PlaySound` has no volume argument.
+- Triggers: `PlayEnter` in `DeadEyeManager.TryEnter`, `PlayMark` in `TryMark` (only when a mark is actually added). Files are located next to the dll under `DeadEye/Asset`, validated once (PCM16 RIFF only); a missing/invalid file logs one error and silences the sounds.
+- The csproj post-build copies `Asset/*.wav` to `Mods/DeadEye/Asset` and `Release/DeadEye/Asset`; without that folder the mod logs `sound effects unavailable` and continues silently.
+
+## 16. Maintenance rules
 
 - Version numbers live in exactly four places: `BuildInfo.cs`, the README badge, the CHANGELOG first section, and the header line above. Never in code comments.
 - Any constraint decided during debugging gets a row in §10, and the source comment keeps only one line plus a "see §10" pointer.

@@ -61,6 +61,13 @@ internal class Settings : JsonModSettings
     [Slider(0f, 0.6f)]
     public float OverlayOpacity = 0.22f;
 
+    [Section("音效")]
+
+    [Name("音效音量")]
+    [Description("进入音效与标记音效的音量，0 = 静音。")]
+    [Slider(0f, 1f)]
+    public float SoundVolume = 0.8f;
+
     [Section("调试")]
 
     [Name("输出详细日志")]

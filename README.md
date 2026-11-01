@@ -2,7 +2,7 @@
 
 [English](#english) · [中文](#中文)
 
-![version](https://img.shields.io/badge/version-0.2.1-informational)
+![version](https://img.shields.io/badge/version-0.3.1-informational)
 
 ![game](https://img.shields.io/badge/The%20Long%20Dark-2.55-success)
 
@@ -20,8 +20,8 @@ A The Long Dark mod that slows the world down, lets you mark animals like RDR2's
 
 **Bullet time**
 
-- Press the side mouse button while carrying a revolver — time slows to a tenth speed and the screen tints yellow, like Dead Eye in Red Dead Redemption 2.
-- Press the middle mouse button while looking at a live animal — a red mark appears over it and stays attached to the animal even while it moves.
+- Press the side mouse button while carrying a revolver — time slows to a tenth speed, the screen tints yellow and the signature activation sound plays, like Dead Eye in Red Dead Redemption 2.
+- Press the middle mouse button while looking at a live animal — a red mark appears over it and stays attached to the animal even while it moves, with a short sound confirming the mark.
 - You can mark the same animal several times or several animals in any order — the number of marks never exceeds the rounds left in the revolver's cylinder.
 
 **The execution**
@@ -44,7 +44,7 @@ A The Long Dark mod that slows the world down, lets you mark animals like RDR2's
 ### Installation
 
 1. Make sure `MelonLoader/` exists in the game folder (install it and run the game once if not).
-2. Put `TLD_DeadEye.dll` into `TheLongDark/Mods`.
+2. Put `TLD_DeadEye.dll` into `TheLongDark/Mods`, and the `Asset` folder (the two `.wav` sound files) into `TheLongDark/Mods/DeadEye/Asset`.
 3. Start the game.
 
 ### Usage
@@ -69,6 +69,7 @@ Settings live under **Options → Mod Settings → Dead Eye (死神之眼)**.
 | 疲劳消耗倍率 | Fatigue drain multiplier while marking; raise it to pay more, 1 equals the normal drain | 3 |
 | 黄色滤镜 | Fullscreen yellow tint while marking. **Off** leaves the normal colours | On |
 | 滤镜不透明度 | Strength of the yellow tint; 0 equals no tint | 0.22 |
+| 音效音量 | Volume of the activation and mark sounds; 0 is silent | 0.8 |
 | 输出详细日志 | Writes mode transitions, marks and shots to `MelonLoader/Latest.log` | Off |
 
 ### Tuning
@@ -82,6 +83,7 @@ The defaults aim for RDR2 feel at a tenth speed. If it does not feel right, adju
 
 - Responds only while a save is loaded and the gameplay HUD is up; in menus the keys have no effect and no time-scale change is ever left behind.
 - Does not modify item definitions, weapon stats or save files. It adjusts the same time-scale value as "slow motion"-style mods, so pausing menus or radial-menu slow-down mods may briefly fight it while the mode is on.
+- The sounds are two plain `.wav` files under `Mods/DeadEye/Asset`, played through the Windows system audio interface (`winmm!PlaySound`) — no game audio banks (Wwise) are touched and no Unity audio components are created.
 - **AdaptiveArsenal compatible**: detected automatically (with or without it, shots land on the marked point).
 
 ### FAQ
@@ -94,7 +96,7 @@ A mark on an animal that dies before the sequence reaches it is skipped; shots l
 
 ### Uninstall
 
-Delete `TheLongDark/Mods/TLD_DeadEye.dll`.
+Delete `TheLongDark/Mods/TLD_DeadEye.dll` (and the `TheLongDark/Mods/DeadEye` folder if you no longer need the sound files).
 
 The save keeps no fields from this mod. If you delete it mid-mode, the next scene load or game restart returns the time scale to normal.
 
@@ -114,8 +116,8 @@ MIT — see [LICENSE](LICENSE).
 
 **子弹时间**
 
-- 携带左轮时按下鼠标后侧键——世界放慢到十分之一速，画面染黄，就是大镖客里死神之眼的味道。
-- 准星对着活物按下鼠标中键——它身上出现一个红色标记，标记会跟着动物移动。
+- 携带左轮时按下鼠标后侧键——世界放慢到十分之一速，画面染黄，标志性启动音效响起，就是大镖客里死神之眼的味道。
+- 准星对着活物按下鼠标中键——它身上出现一个红色标记并跟着动物移动，同时一声短音效确认标记成功。
 - 同一只动物可以标多次，也可以标多只——标记总数永远不会超过左轮弹巢里剩下的子弹数。
 
 **处决**
@@ -138,7 +140,7 @@ MIT — see [LICENSE](LICENSE).
 ### 安装
 
 1. 确认游戏目录下已有 `MelonLoader/` 文件夹（没有就先装 MelonLoader 并启动一次游戏）
-2. 把 `TLD_DeadEye.dll` 复制到 `TheLongDark/Mods/`
+2. 把 `TLD_DeadEye.dll` 复制到 `TheLongDark/Mods/`，并把 `Asset` 文件夹（两个 `.wav` 音效）放到 `TheLongDark/Mods/DeadEye/Asset`
 3. 重启游戏
 
 ### 使用
@@ -163,6 +165,7 @@ MIT — see [LICENSE](LICENSE).
 | 疲劳消耗倍率 | 标记期间疲劳的额外消耗倍率；调大付出更多，1 等于正常速率 | 3 |
 | 黄色滤镜 | 标记期间全屏黄色滤镜；关掉则保持原色 | 开 |
 | 滤镜不透明度 | 黄色滤镜浓度；0 等于没有滤镜 | 0.22 |
+| 音效音量 | 进入音效与标记音效的音量；0 = 静音 | 0.8 |
 | 输出详细日志 | 把模式切换、标记、开火记录写进 `MelonLoader/Latest.log` | 关 |
 
 ### 按症状调参
@@ -176,6 +179,7 @@ MIT — see [LICENSE](LICENSE).
 
 - 只在读档后、游戏 HUD 可用时响应；在菜单里按键无效果，也不会留下任何时间流速残留。
 - 不修改物品定义、武器数值与存档文件。它会调节与「慢动作」类 mod 相同的时间流速值，因此模式开启期间，暂停菜单类或轮盘减速类 mod 可能与它短暂抢时间流速。
+- 音效是 `Mods/DeadEye/Asset` 下的两个普通 `.wav` 文件，通过 Windows 系统音频接口（`winmm!PlaySound`）播放——不触碰游戏音频库（Wwise），也不创建任何 Unity 音频组件。
 - **与 AdaptiveArsenal 兼容**：自动探测有无该 mod，两种弹道下射击都落在标记点上。
 
 ### 常见问题
@@ -188,7 +192,7 @@ MIT — see [LICENSE](LICENSE).
 
 ### 卸载
 
-删掉 `TheLongDark/Mods/TLD_DeadEye.dll` 即可。
+删掉 `TheLongDark/Mods/TLD_DeadEye.dll` 即可（不再需要音效的话可一并删除 `TheLongDark/Mods/DeadEye` 文件夹）。
 
 存档里不会留下本 mod 的任何字段。如果在模式进行中删除，下次读档或重启游戏后时间流速自动恢复正常。
 

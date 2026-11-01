@@ -277,6 +277,7 @@ internal static class DeadEyeManager
         State = DeadEyeState.Marking;
         ModLog.Info($"Dead Eye entered: cap={MarkCap}, bound={GunResolver.BoundGearName}");
         Overlay.SetMessage($"死神之眼 · 标记目标（0/{MarkCap}）", 2.5f);
+        ModAudio.PlayEnter();
     }
 
     private static void BeginExit(bool fireAfter)
@@ -403,6 +404,7 @@ internal static class DeadEyeManager
 
             _marks.Add(new Mark(ai, hit.point));
             Overlay.SetMessage($"已标记 {_marks.Count}/{MarkCap}", 1.2f);
+            ModAudio.PlayMark();
             ModLog.Debug($"marked {ai.gameObject.name} at {hit.point} ({_marks.Count}/{MarkCap})");
             return;
         }

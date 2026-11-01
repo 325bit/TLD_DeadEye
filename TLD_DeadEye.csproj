@@ -33,9 +33,16 @@
     </Reference>
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Shipped sound effects (PCM16 WAV, loaded by Core/ModAudio.cs) -->
+    <AudioAssets Include="Asset\*.wav" />
+  </ItemGroup>
+
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(TheLongDarkPath)/Mods" Condition="Exists('$(TheLongDarkPath)/Mods')" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ReleaseFolderPath)" />
+    <Copy SourceFiles="@(AudioAssets)" DestinationFolder="$(TheLongDarkPath)/Mods/DeadEye/Asset" Condition="Exists('$(TheLongDarkPath)/Mods')" />
+    <Copy SourceFiles="@(AudioAssets)" DestinationFolder="$(ReleaseFolderPath)/DeadEye/Asset" />
   </Target>
 
 </Project>

@@ -1,5 +1,22 @@
 # ChangeLog
 
+## 0.3.1
+
+### Fixed
+
+- **Sounds were silent in-game**: the Unity audio route does not work in this IL2CPP build — `AudioClip.Create` + `SetData` produces an empty clip, and the `DownloadHandlerAudioClip` constructor is stripped (both proven in TLD_LanternBelt). Sounds now play through the Windows system audio interface (`winmm!PlaySound`), same as the lantern mod: Windows decodes the WAV, independent of the game's Wwise mix. Volume is applied by pre-scaling samples into a cached copy (PlaySound has no volume argument). Note: a new sound interrupts the previous one, so a mark confirm cuts off the activation sound.
+
+### Changed
+
+- Sound files now live in `TheLongDark/Mods/DeadEye/Asset` instead of `TheLongDark/Mods/Asset` (the old folder can be deleted).
+
+## 0.3.0
+
+### Added
+
+- **Sound effects**: entering the mode plays the RDR2-style activation sound, and every successful mark plays a short confirmation sound. Two PCM16 WAV files ship in `Mods/Asset` and are loaded by a hand-written RIFF parser (Unity cannot decode MP3 from disk at runtime; the repo mp3s are the editable sources). Playback runs on Unity's DSP clock, so sounds play at normal speed even while bullet time is applied.
+- New setting 音效音量 (sound volume, default 0.8, 0 = silent). The build now deploys `Asset/*.wav` next to the dll; a missing Asset folder only logs an error and disables sounds.
+
 ## 0.2.1
 
 ### Fixed
