@@ -36,6 +36,23 @@ internal static class ModAudio
     internal static void PlayEnter() => Play(_enterPath);
     internal static void PlayMark() => Play(_markPath);
 
+    /// <summary>
+    /// Kill any sound still playing (the 12.6 s activation sound outlives a quick exit).
+    /// SND_PURGE stops every winmm sound issued by this process — the only other user in
+    /// the game process is TLD_LanternBelt's ignite sound, an overlap too rare to matter.
+    /// </summary>
+    internal static void Stop()
+    {
+        try
+        {
+            PlaySound(null, IntPtr.Zero, SndPurge);
+        }
+        catch
+        {
+            // system interface unavailable — nothing to stop
+        }
+    }
+
     private static void Play(string? path)
     {
         if (!_ready && !Prepare())

@@ -1,5 +1,11 @@
 # ChangeLog
 
+## 0.3.2
+
+### Fixed
+
+- The 12.6 s activation sound kept playing to the end after a quick exit from the mode. The mode now stops it the moment it ends — on a cancel (forced exit), on an exit with no marks, and when the firing sequence finishes.
+
 ## 0.3.1
 
 ### Fixed

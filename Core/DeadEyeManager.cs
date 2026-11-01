@@ -126,7 +126,10 @@ internal static class DeadEyeManager
             if (_marks.Count > 0 && IsGameplayActive())
                 StartFiring();
             else
+            {
+                ModAudio.Stop(); // no firing round: the activation sound ends with the mode
                 State = DeadEyeState.Inactive;
+            }
         }
     }
 
@@ -343,6 +346,7 @@ internal static class DeadEyeManager
         // NOTE: _lastAimPoint is intentionally left to expire via its TTL — the last
         // bullet's Start() runs after this and still needs the redirect.
         State = DeadEyeState.Inactive;
+        ModAudio.Stop(); // the activation sound must not outlive the mode
         Overlay.SetMessage("死神之眼结束", 1.5f);
         ModLog.Info("fire sequence finished");
     }
@@ -355,6 +359,7 @@ internal static class DeadEyeManager
         ModLog.Info($"forced exit: {reason}");
         TimeScaler.ForceRestore();
         Overlay.SetOverlay(false);
+        ModAudio.Stop(); // mid-mode cancel: cut the activation sound immediately
         _marks.Clear();
         MarkCap = 0;
         _lastAimPoint = null;
