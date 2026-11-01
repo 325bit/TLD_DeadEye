@@ -27,6 +27,7 @@ internal static class ModAudio
 
     private static string? _enterPath;
     private static string? _markPath;
+    private static string? _assetDir;
     private static string? _scaledSource;      // source of the cached volume-scaled copy
     private static string? _scaledPath;        // the cached volume-scaled copy itself
     private static float _scaledVolume = -1f;
@@ -35,6 +36,32 @@ internal static class ModAudio
 
     internal static void PlayEnter() => Play(_enterPath);
     internal static void PlayMark() => Play(_markPath);
+
+    /// <summary>
+    /// Warm up ahead of the first real use, called every Tick until done: validates the
+    /// files and plays a generated 0.1 s silent WAV once. The very first winmm sound a
+    /// process issues initializes the audio device and that request is swallowed — without
+    /// the warm-up the first activation after game start stays silent (measured in-game).
+    /// </summary>
+    internal static void Tick()
+    {
+        if (_ready || _failed)
+            return;
+        if (!Prepare())
+            return;
+
+        try
+        {
+            string warmup = WriteSilence();
+            if (warmup.Length > 0)
+                PlaySound(warmup, IntPtr.Zero, SndFilename | SndAsync | SndNoDefault);
+            ModLog.Info("sound effects warmed up, first activation will be audible");
+        }
+        catch (Exception ex)
+        {
+            ModLog.Error($"audio warm-up failed: {ex.Message}");
+        }
+    }
 
     /// <summary>
     /// Kill any sound still playing (the 12.6 s activation sound outlives a quick exit).
@@ -102,6 +129,7 @@ internal static class ModAudio
             if (_enterPath == null || _markPath == null)
                 return Fail($"missing or invalid WAV in {dir} (expected {EnterFileName} / {MarkFileName})");
 
+            _assetDir = dir;
             _ready = true;
             ModLog.Info("sound effects ready (system playback, Mods/DeadEye/Asset)");
             return true;
@@ -118,6 +146,38 @@ internal static class ModAudio
             return null;
         byte[] wav = File.ReadAllBytes(path);
         return TryParse(wav, out _) ? path : null;
+    }
+
+    /// <summary>A 0.1 s silent 8 kHz mono PCM16 WAV, written once into the Asset folder.</summary>
+    private static string WriteSilence()
+    {
+        string path = Path.Combine(_assetDir!, "dead-eye-warmup.wav");
+        if (File.Exists(path) && new FileInfo(path).Length > 44)
+            return path;
+
+        const int rate = 8000;
+        const int samples = 800; // 0.1 s of silence
+        using var ms = new MemoryStream();
+        using (var w = new BinaryWriter(ms))
+        {
+            w.Write(0x46464952);             // RIFF
+            w.Write(36 + samples * 2);
+            w.Write(0x45564157);             // WAVE
+            w.Write(0x20746D66);             // "fmt "
+            w.Write(16);
+            w.Write((short)1);               // PCM
+            w.Write((short)1);               // mono
+            w.Write(rate);
+            w.Write(rate * 2);               // byte rate
+            w.Write((short)2);               // block align
+            w.Write((short)16);              // bits
+            w.Write(0x61746164);             // "data"
+            w.Write(samples * 2);
+            for (int i = 0; i < samples; i++)
+                w.Write((short)0);
+        }
+        File.WriteAllBytes(path, ms.ToArray());
+        return path;
     }
 
     /// <summary>Scale the data chunk by <paramref name="volume"/> into a cached sibling file.</summary>

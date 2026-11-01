@@ -1,5 +1,31 @@
 # ChangeLog
 
+## 0.4.3
+
+- Renamed the four revolver choices in the mod settings to the official in-game Chinese item names: 左轮手枪 / 猎人的左轮手枪 / 护林人的左轮手枪 / 典狱长的左轮手枪 (order unchanged, saved selections stay valid).
+- The default fatigue cost is now 1% of the bar per second (was 3%); the slider range is unchanged. Existing save files of the settings keep their previous value — set the slider to 1 manually if you want the new default.
+
+## 0.4.2
+
+- Fixed: the mode still exited instantly on entry (0.4.1). Root cause: `Fatigue.m_CurrentFatigue` is **tiredness** — higher means more exhausted (the game's own `Update` adds the per-hour burn via `AddFatigue`, and `IsExhausted()` is current > threshold); the HUD rest bar is its inverse. The previous fix subtracted cost and treated normalized 0 as "empty", which read a fully rested player as spent.
+- The cost now adds `(FatiguePerSecond / 100) x m_MaxFatigue` per unscaled second (clamped to max), the mode ends when `GetNormalizedFatigue() >= 0.995`, and entering stays blocked while the game's `IsExhausted()` is true. Verified against disassembly of `Fatigue.Update` / `AddFatigue` / `GetNormalizedFatigue` / `IsExhausted`.
+
+## 0.4.1
+
+### Fixed
+
+- Entering Dead Eye force-exited within a frame. Root cause: the internal `Fatigue.m_CurrentFatigue` scale follows `m_MaxFatigue` (the game's own `GetNormalizedFatigue()` divides by it) — it is NOT a fixed 0-100 range. The 0.4.0 drain subtracted absolute points (3/s), which on the normalized scale emptied the bar several times over per second, tripping the empty check instantly. The drain is now expressed relative to `m_MaxFatigue` (3% of the bar per second), and the empty check uses `GetNormalizedFatigue() <= 0.01` instead of an absolute value. Exit reasons in `TickMarking` are split into distinct log lines (gameplay lost / weapon stowed / fatigue empty with the normalized value) so the next misdiagnosis is a one-line grep.
+
+## 0.4.0
+
+### Fixed
+
+- The FIRST activation after starting the game played no activation sound: the very first winmm sound a process issues initializes the audio device and that request gets swallowed. The mod now warms the audio up during normal gameplay (validates the files and plays a generated 0.1 s silent WAV once), so the first real activation is audible.
+
+### Changed
+
+- Fatigue cost reworked: instead of a multiple (3x) of the vanilla drain, Dead Eye now burns a configurable percentage of the full bar per real-time second (setting 疲劳每秒消耗, default 3%, ~33 s from full). The vanilla drain still applies underneath. A fully exhausted survivor cannot enter the mode (as before), and the mode still force-exits when the bar hits zero.
+
 ## 0.3.2
 
 ### Fixed

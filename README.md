@@ -2,7 +2,7 @@
 
 [English](#english) · [中文](#中文)
 
-![version](https://img.shields.io/badge/version-0.3.2-informational)
+![version](https://img.shields.io/badge/version-0.4.3-informational)
 
 ![game](https://img.shields.io/badge/The%20Long%20Dark-2.55-success)
 
@@ -28,11 +28,11 @@ A The Long Dark mod that slows the world down, lets you mark animals like RDR2's
 
 - Press the side mouse button again — time returns to normal, the mod draws your revolver if it was not in hand, and the view glides onto the first mark through the game's own cinematic look-at system. Once the crosshair has swung onto it the sequence opens fire at the weapon's own full rate, one shot per mark, while the view keeps gliding from target to target.
 - Each projectile is redirected the instant it spawns onto a lead-predicted intercept point — where the animal will be when the shot arrives, computed from its tracked movement and the revolver's launch speed (gravity included) — so head marks hit heads and body marks hit bodies even on running targets. The game's own damage, bleed-out, critical-hit and skill-progress rules all apply unchanged.
-- Fatigue drains three times faster while time is slowed, and returns to normal the moment it ends — if you run out of stamina mid-mode, it shuts off by itself.
+- Fatigue drains a configurable percentage of the full bar per real-time second (default 3%, ~33 s from full), and returns to normal the moment it ends — if you run out of stamina mid-mode, it shuts off by itself, and a fully exhausted survivor cannot enter the mode at all.
 
 **Bound weapon**
 
-- Only one revolver triggers the mode — you pick which one (Revolver, Fancy Revolver, Green Revolver, Stub-Nosed Revolver) in the settings; carrying any other gun does nothing.
+- Only one revolver triggers the mode — you pick which one (左轮手枪 / 猎人的左轮手枪 / 护林人的左轮手枪 / 典狱长的左轮手枪, matching the in-game item names) in the settings; carrying any other gun does nothing.
 - With no revolver in your pack, or an empty cylinder, pressing the key does nothing except show a short on-screen reason.
 
 ### Requirements
@@ -66,7 +66,7 @@ Settings live under **Options → Mod Settings → Dead Eye (死神之眼)**.
 | 时间流速 | World speed while marking; raise it for a subtler slowdown | 0.1 |
 | 进入渐变速度 | How fast time slows when entering; raise for a snappier start | 1 |
 | 退出渐变速度 | How fast time returns to normal when leaving; raise for a snappier exit | 3 |
-| 疲劳消耗倍率 | Fatigue drain multiplier while marking; raise it to pay more, 1 equals the normal drain | 3 |
+| 疲劳每秒消耗 | Fatigue drain while marking, as a percentage of the full bar per real-time second; raise it to pay more | 1 |
 | 黄色滤镜 | Fullscreen yellow tint while marking. **Off** leaves the normal colours | On |
 | 滤镜不透明度 | Strength of the yellow tint; 0 equals no tint | 0.22 |
 | 音效音量 | Volume of the activation and mark sounds; 0 is silent | 0.8 |
@@ -124,11 +124,11 @@ MIT — see [LICENSE](LICENSE).
 
 - 再按一次鼠标后侧键——时间恢复，mod 替你拔出左轮（如果不在手上），视角通过游戏自带的过场演出视角系统先滑向第一个标记；准星甩到位后立刻以武器原生满射速逐个开火，视角同时在目标之间连续滑移。
 - 每发弹丸在出膛瞬间被重定向到**提前量拦截点**——根据动物当前移动速度与左轮出膛速度（含重力下坠）计算「子弹到达时它会在哪」——所以奔跑中的目标也能标头打头、标身打身。游戏自己的伤害、失血、要害判定和技能经验全部原样生效。
-- 标记期间疲劳以三倍速消耗，结束立刻恢复——中途力竭会自动收招。
+- 标记期间疲劳按真实时间每秒消耗总量的一定百分比（默认 3%，满疲劳约 33 秒耗空），结束立刻恢复——中途力竭会自动收招，完全力竭时根本进不了模式。
 
 **绑定武器**
 
-- 只有你指定的那一把左轮能触发模式——在设置里四选一（左轮手枪、华贵左轮、绿色左轮、短管左轮）；带别的枪按了没反应。
+- 只有你指定的那一把左轮能触发模式——在设置里四选一（左轮手枪、猎人的左轮手枪、护林人的左轮手枪、典狱长的左轮手枪）；带别的枪按了没反应。
 - 背包里没有这把左轮、或弹巢是空的，按键只会给出一行屏幕提示，不会进入模式。
 
 ### 前置条件
@@ -162,7 +162,7 @@ MIT — see [LICENSE](LICENSE).
 | 时间流速 | 标记期间的世界流速；调大则减速更轻 | 0.1 |
 | 进入渐变速度 | 进入时时间放慢的快慢；调大更干脆 | 1 |
 | 退出渐变速度 | 退出时时间恢复的快慢；调大更干脆 | 3 |
-| 疲劳消耗倍率 | 标记期间疲劳的额外消耗倍率；调大付出更多，1 等于正常速率 | 3 |
+| 疲劳每秒消耗 | 标记期间每秒（真实时间）消耗疲劳上限的百分比；调大付出更多 | 1 |
 | 黄色滤镜 | 标记期间全屏黄色滤镜；关掉则保持原色 | 开 |
 | 滤镜不透明度 | 黄色滤镜浓度；0 等于没有滤镜 | 0.22 |
 | 音效音量 | 进入音效与标记音效的音量；0 = 静音 | 0.8 |

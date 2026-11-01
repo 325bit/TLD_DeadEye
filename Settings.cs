@@ -13,7 +13,7 @@ internal class Settings : JsonModSettings
 
     [Name("绑定的左轮手枪")]
     [Description("只有这把左轮能触发死神之眼。进入标记模式前会检查背包与手上是否携带它，标记次数上限等于它的剩余装弹数。")]
-    [Choice("左轮手枪", "华贵左轮", "绿色左轮", "短管左轮")]
+    [Choice("左轮手枪", "猎人的左轮手枪", "护林人的左轮手枪", "典狱长的左轮手枪")]
     public int BoundRevolver = 0;
 
     [Section("按键")]
@@ -45,10 +45,10 @@ internal class Settings : JsonModSettings
 
     [Section("体力消耗")]
 
-    [Name("疲劳消耗倍率")]
-    [Description("标记模式期间疲劳的额外消耗倍率。3 = 正常速率的三倍（在时间放缓后的实际游戏时间里按倍率折算），退出后恢复正常。")]
-    [Slider(1f, 10f)]
-    public float FatigueMultiplier = 3f;
+    [Name("疲劳每秒消耗")]
+    [Description("标记模式期间每秒消耗疲劳上限的百分比（按真实时间计），1 = 每秒烧掉总量的 1%，满疲劳约 100 秒耗空。疲劳耗尽时模式自动退出；完全力竭时无法进入死神之眼。")]
+    [Slider(0.5f, 10f)]
+    public float FatiguePerSecond = 1f;
 
     [Section("视觉")]
 

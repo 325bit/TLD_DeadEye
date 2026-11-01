@@ -19,7 +19,7 @@ RDR2-style Dead Eye for The Long Dark 2.55: bullet-time marking mode plus a chai
 | `Core/Ballistics.cs` | Muzzle-velocity table (AdaptiveArsenal values) + fixed-point intercept prediction for moving targets |
 | `Core/ModAudio.cs` | Loads the two WAV sound effects from `Mods/DeadEye/Asset` (hand-parsed RIFF/PCM16) and plays them through `winmm!PlaySound` |
 | `Ui/Overlay.cs` | Yellow Canvas filter + OnGUI markers and message line |
-| `Patches/Patches.cs` | `BulletStartPatch` (redirect spawned bullet onto the predicted intercept point, zero spread) and `FatiguePatch` (drain multiplier) |
+| `Patches/Patches.cs` | `BulletStartPatch` (redirect spawned bullet onto the predicted intercept point, zero spread) and `FatiguePatch` (flat percent-per-second drain) |
 
 Visual glide: no dedicated component — `DeadEyeManager.IssueLookAt` issues one-shot requests through the game's own `PlayerManager.RequestLookAtTarget` (see §6).
 
@@ -44,7 +44,7 @@ Patches
 
 | Target | Kind | Why |
 |---|---|---|
-| `Fatigue.Update` | Postfix | Extra fatigue burn while marking; uses the game's own per-hour rate and scaled delta |
+| `Fatigue.Update` | Postfix | Flat fatigue cost while marking: `FatiguePerSecond` percent of the bar per UNSCALED second, ADDED to `m_CurrentFatigue` (tiredness) scaled by `m_MaxFatigue` |
 | `vp_Bullet.Start` | Prefix (private, patched by name) | Vanilla path only (AdaptiveArsenal absent): vanilla resolves the hit inside the bullet's `Start()` raycast; the prefix redirects the freshly spawned bullet straight onto the lead-predicted intercept point and zeroes its `Accuracy` spread. Aim point comes from `DeadEyeManager.LastShotAimPoint` (snapshotted at `Fire()` time, TTL 0.5 s, since the sequencer already advanced and the LAST bullet's `Start()` even runs after the state machine is back to `Inactive`) |
 | `AdaptiveArsenal.Components.ProjectileItem.Fire` | Prefix, bound dynamically via `AccessTools.TypeByName` at startup | AdaptiveArsenal path: its `vp_FPSShooter.Awake` prefix swaps `ProjectilePrefab` for its own physics projectile (Rigidbody, gravity, drag, random spread) and its `Fire` prefix spawns it via `SpawnAndFire` — the vanilla `vp_Bullet` is NEVER spawned, which made the patch above dead code (verified by live logs: 0 redirect lines across every 0.1.4/0.1.5 test shot). Must be a **prefix** (0.2.1 lesson: the launch is `AddForce`, which only lands on the next physics step, so a postfix reads a zero velocity): the prefix aims the projectile transform before the body runs, so AdaptiveArsenal's own launch force flies exactly onto the mark and its random spread is bypassed |
 
@@ -66,7 +66,7 @@ Deliberately **not** patched: `vp_FPSShooter.Fire` (called directly — it alrea
 | `FirstPersonWeapon.m_FrontSight / m_RearSight / m_BulletEmissionPoint` | Sight-projection math (mirrors AdaptiveArsenal `ProjectileUtilities`) |
 | `vp_FPSCamera.Angle` / `SetAngle(yaw, pitch)` | The game's authoritative look state (`m_Yaw` 0x144 / `m_Pitch` 0x140, verified by `set_Angle` stores). `Angle` = (yaw, pitch). `LookAtTargetForTime.Update` ends in `set_Angle`, so this is the sanctioned write path |
 | `vp_Bullet` (`Range/Damage/Accuracy/...`) | Vanilla projectile component; the hit is resolved inside its `Start()` raycast. `Accuracy` is residual spread (zeroed for sequence shots). Only spawns when AdaptiveArsenal is absent |
-| `Fatigue.m_CurrentFatigue` / `m_CurrentFatigueBurnPerHour` | 0-100 (higher = more rested); current per-hour burn applied by the game each tick |
+| `Fatigue.m_CurrentFatigue` / `m_MaxFatigue` / `GetNormalizedFatigue()` | m_CurrentFatigue is TIREDNESS: higher = more exhausted (`Fatigue.Update` ADDS the burn via `AddFatigue`; `IsExhausted()` is current > threshold; the HUD rest bar is the inverse). Scale follows `m_MaxFatigue`; `GetNormalizedFatigue()` = current / max |
 | `BaseAi.GetAiMode() != AiMode.Dead` | Alive check for marks; animal hitboxes live on layers 16 (direct) / 27 (parent) |
 | Muzzle velocities (AdaptiveArsenal `ProjectileItem` table) | Revolver 400 / Fancy 600 / Green 400 / StubNosed 300 m/s nominal; AdaptiveArsenal launches at x 0.5 (its `ScaleMultiplier`) under gravity, so with it present the lead prediction uses the halved speeds and adds a gravity-drop offset to the aim point |
 | `PlayerManager.RequestLookAtTarget(LookAtTargetForTime)` | Game-native look-at glide (story-mode cutscenes use it). Verified by disassembly: the struct is stored wholesale and its `Update()` slerps from `m_RestoreCameraOrientation` (caller-provided start) to `m_CameraTargetOrientation` over `m_BlendInTime` with the chosen `UITweener.Method`, ending in euler → negated → `vp_FPSCamera.set_Angle`. With `m_ShouldRestoreCameraOrientation=false` there is no blend-out — the view pins at the target until `m_TimeRemaining` expires. `PlayerManager.Update` invokes it with **no weapon-state gating** (only the `m_IsLookAtTargetForTimeActive` flag at 0x540), so glides work with a gun raised |
@@ -92,7 +92,7 @@ Deliberately **not** patched: `vp_FPSShooter.Fire` (called directly — it alrea
 
 ## 8. Settings mapping
 
-Every entry in `Settings.cs` maps 1:1 to the README settings table (both language blocks). Defaults: time scale 0.1, enter lerp 1, exit lerp 3, fatigue x3, tint 0.22, sound volume 0.8. Keybind defaults `Mouse3` (side) / `Mouse2` (middle) via the ModSettings key-capture widget; rebindable to any key or mouse button.
+Every entry in `Settings.cs` maps 1:1 to the README settings table (both language blocks). Defaults: time scale 0.1, enter lerp 1, exit lerp 3, fatigue 1 %/s, tint 0.22, sound volume 0.8. Choice labels for the four revolvers mirror the official in-game Chinese item names (the strings live in Settings.cs, which is allowed to be Chinese as in-game copy). Label order is fixed to the GearNames table — never reorder the Choice attributes without reordering GearNames. Keybind defaults `Mouse3` (side) / `Mouse2` (middle) via the ModSettings key-capture widget; rebindable to any key or mouse button.
 
 ## 9. Logging
 
@@ -109,7 +109,7 @@ All output goes through `ModLog` with the `[DEBUG]` prefix gated by the Verbose 
 | 4 | Mark cap strictly equals `NumRoundsInClip()` at entry | Fire() dry-fires mid-sequence | Cap never recomputed mid-mode |
 | 5 | Chain-fire only the bound revolver | A swapped weapon gets force-fired | `TickFiring` aborts on weapon-name mismatch |
 | 6 | Every `Tick` ends in a state that can restore time, tint and marks | Residual slow-mo / tint after death, menu, scene change | Fool-proof branch + `HardReset` on scene load |
-| 7 | Fatigue drain uses the game's own `m_CurrentFatigueBurnPerHour` and scaled delta | Drain desyncs from the HUD's expectation | Postfix adds (multiplier - 1) x vanilla rate |
+| 7 | Fatigue semantics: m_CurrentFatigue is tiredness (high = exhausted); the mode ADDS cost and ends at normalized 1 | Treating it as rest (drain = subtract, empty = 0) made the mode exit instantly on a rested player | Postfix adds `(FatiguePerSecond / 100) x m_MaxFatigue x Time.unscaledDeltaTime` clamped to max; spent check is `GetNormalizedFatigue() >= 0.995`; entry gate is the game's `IsExhausted()` |
 | 8 | No managed-type fields across scene loads besides the driver | Stale `BaseAi`/`GearItem` references after a load | Marks cleared on every exit path |
 
 ## 11. Comment migration map
@@ -128,7 +128,7 @@ All output goes through `ModLog` with the `[DEBUG]` prefix gated by the Verbose 
 
 ## 12. Compatibility
 
-- Touches: `Time.timeScale` + `GameManager.m_GlobalTimeScale` (only while `Owned`), `Fatigue.m_CurrentFatigue` (extra drain while marking), freshly spawned projectile transforms/velocity (only for shots committed by this mod, TTL 0.5 s), the player look state via the game's own look-at system (only while firing).
+- Touches: `Time.timeScale` + `GameManager.m_GlobalTimeScale` (only while `Owned`), `Fatigue.m_CurrentFatigue` (flat drain while marking), freshly spawned projectile transforms/velocity (only for shots committed by this mod, TTL 0.5 s), the player look state via the game's own look-at system (only while firing).
 - **AdaptiveArsenal**: detected at startup (reflection on `AdaptiveArsenal.Components.ProjectileItem`, no hard dependency). When present, Dead Eye binds a postfix onto its private `ProjectileItem.Fire` and switches ballistics to its effective speeds (table x 0.5 + gravity). When absent, the vanilla `vp_Bullet.Start` redirect is used.
 - Conflicts possible with mods that also drive the global time scale (slow-motion, radial-menu slow-down) or redirect projectiles while the mode is active; nothing is written outside the mode.
 - No item definitions, prefabs, save data or Wwise banks are modified.

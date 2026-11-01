@@ -66,6 +66,11 @@ internal static class DeadEyeManager
 
     internal static void Tick()
     {
+        // Warm the audio subsystem up during normal gameplay, long before the first
+        // activation — the first winmm sound a process issues would otherwise be swallowed.
+        if (State == DeadEyeState.Inactive && IsGameplayActive())
+            ModAudio.Tick();
+
         // Keep target velocities fresh for the lead prediction while marks exist.
         if (_marks.Count > 0)
         {
@@ -99,9 +104,19 @@ internal static class DeadEyeManager
 
     private static void TickMarking()
     {
-        if (!IsGameplayActive() || _boundGun == null || !IsBoundGunStillCarried() || FatigueEmpty())
+        if (!IsGameplayActive())
         {
-            ForceExit("gameplay lost, weapon stowed or exhausted");
+            ForceExit("gameplay lost");
+            return;
+        }
+        if (_boundGun == null || !IsBoundGunStillCarried())
+        {
+            ForceExit("weapon stowed");
+            return;
+        }
+        if (FatigueEmpty())
+        {
+            ForceExit($"fatigue empty (norm={GameManager.GetFatigueComponent()?.GetNormalizedFatigue():F3})");
             return;
         }
 
@@ -273,12 +288,14 @@ internal static class DeadEyeManager
         _lastAimPoint = null;
         _aimPointExpiry = 0f;
 
+        var fatigueNow = GameManager.GetFatigueComponent();
+
         // NOTE: no auto-draw here. The revolver stays wherever it is (hands or backpack)
         // during bullet time; drawing happens only when the firing sequence starts.
         TimeScaler.LerpTo(settings.TargetTimeScale, settings.EnterLerpSpeed);
         Overlay.SetOverlay(settings.YellowOverlay && settings.OverlayOpacity > 0f);
         State = DeadEyeState.Marking;
-        ModLog.Info($"Dead Eye entered: cap={MarkCap}, bound={GunResolver.BoundGearName}");
+        ModLog.Info($"Dead Eye entered: cap={MarkCap}, bound={GunResolver.BoundGearName}, fatigue norm={fatigueNow?.GetNormalizedFatigue():F3}");
         Overlay.SetMessage($"死神之眼 · 标记目标（0/{MarkCap}）", 2.5f);
         ModAudio.PlayEnter();
     }
@@ -461,7 +478,9 @@ internal static class DeadEyeManager
     private static bool FatigueEmpty()
     {
         var fatigue = GameManager.GetFatigueComponent();
-        return fatigue != null && fatigue.m_CurrentFatigue <= 0.5f;
+        // m_CurrentFatigue is TIREDNESS (higher = more exhausted; the HUD rest bar is the
+        // inverse), so the mode must end when the normalized value reaches 1, not 0.
+        return fatigue == null || fatigue.GetNormalizedFatigue() >= 0.995f;
     }
 
     private static bool KeyPressed(KeyCode? key) => key.HasValue && Input.GetKeyDown(key.Value);

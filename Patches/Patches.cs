@@ -39,10 +39,12 @@ internal static class BulletStartPatch
 }
 
 /// <summary>
-/// Fatigue drain multiplier while Dead Eye is active (default 3x).
-/// The vanilla Update already applied its own burn this frame; we add (multiplier - 1)
-/// extra burn using the same per-hour rate and the same scaled delta time the game used,
-/// so the drain scales naturally with the bullet-time time scale.
+/// Fatigue cost while Dead Eye is active: a percentage of the full bar per real-time
+/// second (default 3, i.e. the bar lasts ~33 s). IMPORTANT: m_CurrentFatigue is
+/// TIREDNESS — higher means more exhausted (the game's own Update ADDS the per-hour burn
+/// via AddFatigue, and IsExhausted is current &gt; threshold); the HUD rest bar is its
+/// inverse. Paying fatigue therefore ADDS to m_CurrentFatigue, relative to m_MaxFatigue.
+/// UNSCALED delta time keeps the cost predictable regardless of the bullet-time scale.
 /// </summary>
 [HarmonyPatch(typeof(Fatigue), nameof(Fatigue.Update))]
 internal static class FatiguePatch
@@ -54,14 +56,13 @@ internal static class FatiguePatch
             if (DeadEye.Core.DeadEyeManager.State != DeadEye.Core.DeadEyeState.Marking)
                 return;
 
-            float multiplier = DeadEyeMod.Settings?.FatigueMultiplier ?? 3f;
-            if (multiplier <= 1f)
+            float perSecond = DeadEyeMod.Settings?.FatiguePerSecond ?? 1f;
+            if (perSecond <= 0f)
                 return;
 
-            float extraBurn = __instance.m_CurrentFatigueBurnPerHour
-                              * (Time.deltaTime / 3600f)
-                              * (multiplier - 1f);
-            __instance.m_CurrentFatigue = Mathf.Max(0f, __instance.m_CurrentFatigue - extraBurn);
+            float cost = (perSecond / 100f) * __instance.m_MaxFatigue * Time.unscaledDeltaTime;
+            __instance.m_CurrentFatigue = Mathf.Min(
+                __instance.m_MaxFatigue, __instance.m_CurrentFatigue + cost);
         }
         catch (System.Exception ex)
         {
