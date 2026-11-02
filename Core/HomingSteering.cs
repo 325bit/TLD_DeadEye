@@ -487,6 +487,93 @@ internal static class HomingSteering
     }
 
     /// <summary>
+    /// The body point the shot is being described by, resolved from the animal's CURRENT
+    /// root — one place, so the flight steering and the impact bookkeeping cannot disagree.
+    /// </summary>
+    private static Vector3 BodyPointOf(Entry entry)
+    {
+        Vector3 root = entry.Target.transform.position;
+        return entry.SmallPrey
+            ? AnimalBody.PreyAimPoint(root, entry.BodyOffset)
+            : root + Vector3.up * entry.AimHeight;
+    }
+
+    private static bool BelongsToTarget(Entry entry, Collider collider)
+    {
+        try
+        {
+            if (collider == null || entry.Target == null)
+                return false;
+            Transform probe = collider.transform;
+            Transform root = entry.Target.transform;
+            return probe == root || probe.IsChildOf(root);
+        }
+        catch (System.Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// A contact is the round's true final position: the segment that reached the animal was
+    /// never sampled, because the physics step that ends the flight is the one that destroys
+    /// the round. Recording it here is what stops the pass report from claiming a contact hit
+    /// passed 8-17 m wide (one physics step of travel) and "never crossed" the hitbox it hit.
+    /// Only a collider belonging to the tracked animal counts as a hitbox crossing, so a round
+    /// that hits the scenery or another animal still reports the distance it truly ended at.
+    /// </summary>
+    private static void RecordImpact(Entry entry, Collider collider, Vector3 point)
+    {
+        try
+        {
+            float speed = entry.SpawnSpeed;
+            try
+            {
+                if (entry.Body != null && entry.Body.velocity.sqrMagnitude > 0.01f)
+                    speed = entry.Body.velocity.magnitude;
+            }
+            catch (System.Exception) { }
+
+            Vector3 bodyPoint = BodyPointOf(entry);
+            Vector3 miss = point - bodyPoint;
+
+            if (entry.Samples == 0)
+            {
+                entry.Samples = 1;
+                entry.SpawnSpeed = speed;
+                entry.FirstTrackAt = Time.unscaledTime;
+            }
+
+            entry.LastPos = point;
+            entry.LastBodyPoint = bodyPoint;
+
+            if (miss.magnitude < entry.ClosestDistance)
+            {
+                entry.ClosestDistance = miss.magnitude;
+                entry.ClosestMiss = miss;
+                entry.ClosestVelocity = entry.LastTargetVelocity;
+                entry.ClosestRoundSpeed = speed > 0f ? speed : entry.SpawnSpeed;
+                entry.ClosestRoundPos = point;
+                entry.ClosestBodyPoint = bodyPoint;
+                entry.ClosestSeconds = Time.unscaledTime - entry.FirstTrackAt;
+            }
+
+            if (!BelongsToTarget(entry, collider))
+                return;
+
+            entry.HitboxCrossed = true;
+            entry.HitboxDamageable = RoundResolution.IsDamageable(collider);
+            entry.HitboxSeconds = Time.unscaledTime - entry.FirstTrackAt;
+            entry.HitboxFrame = entry.Samples;
+            entry.HitboxDesc = DescribeHitbox(collider);
+        }
+        catch (System.Exception ex)
+        {
+            ModLog.Debug($"homing: impact not recorded ({ex.Message})");
+        }
+    }
+
+    /// <summary>
     /// Called from the collision prefix when a round physically contacts something. Returns
     /// true when the round belongs to Dead Eye: the contact is resolved HERE — damage when
     /// the collider is damageable, effects, teardown — and the caller skips AdaptiveArsenal's
@@ -509,6 +596,7 @@ internal static class HomingSteering
             if (!entry.Resolved)
             {
                 entry.Resolved = true;
+                RecordImpact(entry, collider, point);
                 Vector3 forward = Vector3.forward;
                 try
                 {
@@ -604,11 +692,8 @@ internal static class HomingSteering
                     continue; // still waiting for AdaptiveArsenal's launch force to land
 
                 Vector3 bodyPos = entry.Body.transform.position;
-                Vector3 root = entry.Target.transform.position;
-                Vector3 bodyPoint = entry.SmallPrey
-                    ? AnimalBody.PreyAimPoint(root, entry.BodyOffset)
-                    : root + Vector3.up * entry.AimHeight;
-                Vector3 targetVelocity = VelocityOf(entry, root);
+                Vector3 bodyPoint = BodyPointOf(entry);
+                Vector3 targetVelocity = VelocityOf(entry, entry.Target.transform.position);
 
                 bool passed = TrackClosest(entry, bodyPos, bodyPoint, speed, velocity, targetVelocity);
 

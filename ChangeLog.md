@@ -1,5 +1,11 @@
 # ChangeLog
 
+## 0.7.7
+
+- **A round killed by a physical contact now reports where it actually died.** The pass report reads its last recorded sample, but the physics step that ends a flight is also the step that destroys the round — so the segment that reached the animal was never sampled, and every contact hit reported the distance it had one whole step earlier. In the last session that meant `closest 8.44-17.51 m` and `hitbox never crossed` on all 7 contact hits, while the same rounds logged `contact resolved on capsule_body ... 31.0 m from the muzzle, damage 598 applied`: the numbers contradicted each other and made a real hit indistinguishable from a 15 m miss.
+- The contact point is now written into the round's bookkeeping before teardown (position, body point, miss vector, distance, speed, time), and a contact with a collider belonging to the tracked animal is recorded as the hitbox crossing it is. A contact with scenery or with a *different* animal still reports the true distance the round ended at, and still does not claim a crossing.
+- Only the path-test resolutions were trustworthy before this (`closest 0.10 / 0.26 m` in that session); after it both resolution paths describe the same thing.
+
 ## 0.7.6
 
 - **The execution hold ends when the last round can no longer achieve anything, not when its lifetime runs out.** The 0.7.5 session held bullet time for **5.6 s after the final hit**: one round of a five-round volley flew past the ptarmigan, reported `passed`, and then kept being steered at it until its own 8 s no-contact expiry — the hold waited on the whole 8 s. A round that has already flown past its animal can never be turned around into it in a useful time, so it now leaves the count (and steering) the moment it passes.
