@@ -32,6 +32,13 @@ internal class Settings : JsonModSettings
     [Slider(0f, 1f)]
     public float PreyAimFraction = 0.6f;
 
+    [Name("近失补偿半径")]
+    [Description("弹道从标记猎物的伤害碰撞体该距离（米）以内擦过时，按命中结算（0 = 仅精确接触才算）。补偿真实弹头直径与瞄准容错——只要求贴近，不要求正中。别调太大：0.15 以上开始打空气。立刻生效。")]
+    [Slider(0f, 0.15f)]
+    public float NearMissRadius = 0.1f;
+
+    internal const float DefaultNearMissRadius = 0.1f;
+
     [Section("按键")]
 
     [Name("进入 / 退出死神之眼")]

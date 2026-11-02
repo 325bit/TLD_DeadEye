@@ -129,6 +129,78 @@ internal static class FatiguePatch
 }
 
 /// <summary>
+/// Names the collider that ate the round, and takes the hit resolution over for Dead Eye
+/// rounds. AdaptiveArsenal damages only from a physics callback and destroys on ANY solid
+/// contact, so "round gone, hitbox never crossed" proved a hit but not on what. This prefix
+/// logs the identity, the material tag, the player distance and impact speed; for Dead Eye
+/// rounds it then resolves the contact itself (<see cref="Core.HomingSteering.ResolveContact"/>) and returns
+/// false to skip AdaptiveArsenal's handler. Manual rounds return true and keep its behaviour.
+/// </summary>
+internal static class AdaptiveCollisionProbe
+{
+    internal static bool Prefix(object __instance, Collision collision)
+    {
+        try
+        {
+            Collider? collider = collision?.collider;
+            if (collider == null || collider.gameObject == null)
+                return true; // unattributable contact: leave AdaptiveArsenal's handler in charge
+
+            Component? round = __instance as Component;
+            Vector3 impact = round != null ? round.transform.position : collider.transform.position;
+
+            float distance = -1f;
+            float speed = -1f;
+            try
+            {
+                distance = Vector3.Distance(GameManager.GetPlayerTransform().position, impact);
+            }
+            catch (System.Exception) { }
+
+            var body = round != null ? round.GetComponent<Rigidbody>() : null;
+            if (body != null)
+                speed = body.velocity.magnitude;
+
+            ModLog.Info($"projectile probe: round destroyed, {Core.HomingSteering.DescribeHitbox(collider)}, " +
+                         $"material {Utils.GetMaterialTagForObjectAtPosition(collider.gameObject, impact)}, " +
+                         $"{(distance >= 0f ? $"{distance:F1} m from the player" : "player distance unreadable")}, " +
+                         $"{(speed >= 0f ? $"v {speed:F0} m/s" : "speed unreadable")}");
+        }
+        catch (System.Exception ex)
+        {
+            ModLog.Error($"projectile probe failed: {ex.Message}");
+        }
+
+        // Takeover: Dead Eye rounds are resolved here and AdaptiveArsenal's handler is
+        // skipped — its pipeline depends on physics contacts the animals' animated colliders
+        // do not produce, and its deferred Destroy let one stationary round re-damage on
+        // every contact (§10 #25). Manual rounds keep the original behaviour.
+        try
+        {
+            if (__instance is Component round && collision != null)
+            {
+                Collider? collider = collision.collider;
+                Vector3 point = round.transform.position;
+                if (collider != null)
+                {
+                    var contacts = collision.contacts;
+                    if (contacts != null && contacts.Length > 0)
+                        point = contacts[0].point;
+                    if (Core.HomingSteering.ResolveContact(round, collider, point))
+                        return false;
+                }
+            }
+        }
+        catch (System.Exception ex)
+        {
+            ModLog.Error($"contact takeover failed: {ex.Message}");
+        }
+
+        return true;
+    }
+}
+
+/// <summary>
 /// AdaptiveArsenal path: its ProjectileItem commits the launch inside its private Fire()
 /// via AddForce(transform.forward x speed) — which only lands on the NEXT physics step, so
 /// a postfix reading velocity sees zero and silently skips. Bound dynamically at startup

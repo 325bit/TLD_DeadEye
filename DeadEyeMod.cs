@@ -81,6 +81,15 @@ public class DeadEyeMod : MelonMod
             HarmonyInstance.Patch(fire, prefix: new HarmonyLib.HarmonyMethod(
                 typeof(Patches.AdaptiveProjectileRedirectPatch), nameof(Patches.AdaptiveProjectileRedirectPatch.Prefix)));
             Core.Ballistics.SetAdaptiveBallistics(true);
+
+            // Collision probe: names what every round dies on. AdaptiveArsenal destroys its
+            // projectile on any solid contact, so the pass report's "round gone" needs this
+            // to separate a genuine obstacle from one of the animals' aux colliders.
+            var onCollision = HarmonyLib.AccessTools.Method(type, "OnCollisionEnter");
+            if (onCollision != null)
+                HarmonyInstance.Patch(onCollision, prefix: new HarmonyLib.HarmonyMethod(
+                    typeof(Patches.AdaptiveCollisionProbe), nameof(Patches.AdaptiveCollisionProbe.Prefix)));
+
             LoggerInstance.Msg("AdaptiveArsenal detected: projectile aim bound to its Fire method, ballistics halved to its effective speeds");
         }
         catch (Exception ex)
