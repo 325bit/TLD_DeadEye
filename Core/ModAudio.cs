@@ -1,47 +1,87 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace DeadEye.Core;
 
 /// <summary>
-/// Sound effects are played through winmm!PlaySound instead of Unity audio: in this
-/// IL2CPP build AudioClip.Create + SetData yields an empty clip (length/frequency/channels
-/// all zero) and the DownloadHandlerAudioClip constructor is stripped — both proven dead
-/// ends in TLD_LanternBelt. Windows decodes the WAV itself, independent of the game's
-/// Wwise mix. PlaySound has no volume argument, so volume is applied by pre-scaling the
-/// samples into a cached copy. Files live in Mods\DeadEye\Asset next to the dll.
+/// Sound effects go through winmm's waveOut API instead of Unity audio: in this IL2CPP
+/// build AudioClip.Create + SetData yields an empty clip and the DownloadHandlerAudioClip
+/// constructor is stripped (both proven dead ends in TLD_LanternBelt). Each sound opens its
+/// OWN waveOut handle, so overlapping sounds never cut each other off — winmm!PlaySound is
+/// single-channel per process and the mark chime used to kill the activation sound. Volume
+/// is applied by scaling samples in memory, so no cached _v.wav copies are written.
 /// </summary>
 internal static class ModAudio
 {
     private const string EnterFileName = "dead-eye-rdr2.wav";
     private const string MarkFileName = "dead-eye-mark.wav";
 
-    private const uint SndAsync = 0x0001;
-    private const uint SndNoDefault = 0x0002;
-    private const uint SndFilename = 0x00020000;
-    private const uint SndPurge = 0x0040;
+    private const int WaveMapper = -1;
+    private const uint WhdrDone = 0x00000001;
 
-    [DllImport("winmm.dll", CharSet = CharSet.Unicode)]
-    private static extern bool PlaySound(string? pszSound, IntPtr hmod, uint fdwSound);
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    private struct WaveFormatEx
+    {
+        internal ushort FormatTag;
+        internal ushort Channels;
+        internal uint SamplesPerSec;
+        internal uint AvgBytesPerSec;
+        internal ushort BlockAlign;
+        internal ushort BitsPerSample;
+        internal ushort Size;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WaveHdr
+    {
+        internal IntPtr Data;
+        internal uint BufferLength;
+        internal uint BytesRecorded;
+        internal IntPtr User;
+        internal uint Flags;
+        internal uint Loops;
+        internal IntPtr Next;
+        internal IntPtr Reserved;
+    }
+
+    [DllImport("winmm.dll")]
+    private static extern int waveOutOpen(out IntPtr handle, int deviceId, ref WaveFormatEx format,
+        IntPtr callback, IntPtr instance, uint flags);
+
+    [DllImport("winmm.dll")]
+    private static extern int waveOutPrepareHeader(IntPtr handle, IntPtr header, int size);
+
+    [DllImport("winmm.dll")]
+    private static extern int waveOutWrite(IntPtr handle, IntPtr header, int size);
+
+    [DllImport("winmm.dll")]
+    private static extern int waveOutReset(IntPtr handle);
+
+    [DllImport("winmm.dll")]
+    private static extern int waveOutUnprepareHeader(IntPtr handle, IntPtr header, int size);
+
+    [DllImport("winmm.dll")]
+    private static extern int waveOutClose(IntPtr handle);
 
     private static string? _enterPath;
     private static string? _markPath;
-    private static string? _assetDir;
-    private static string? _scaledSource;      // source of the cached volume-scaled copy
-    private static string? _scaledPath;        // the cached volume-scaled copy itself
-    private static float _scaledVolume = -1f;
     private static bool _ready;
     private static bool _failed;
 
-    internal static void PlayEnter() => Play(_enterPath);
-    internal static void PlayMark() => Play(_markPath);
+    private static CachedClip? _enterClip;
+    private static CachedClip? _markClip;
+    private static Playback? _background; // the long activation sound, the only one we stop
+
+    internal static void PlayEnter() => Play(enter: true);
+    internal static void PlayMark() => Play(enter: false);
 
     /// <summary>
     /// Warm up ahead of the first real use, called every Tick until done: validates the
-    /// files and plays a generated 0.1 s silent WAV once. The very first winmm sound a
-    /// process issues initializes the audio device and that request is swallowed — without
-    /// the warm-up the first activation after game start stays silent (measured in-game).
+    /// files and plays a short silent buffer once. The very first sound a process issues
+    /// can be swallowed while the device is brought up — without this the first activation
+    /// after game start stays silent (measured in-game).
     /// </summary>
     internal static void Tick()
     {
@@ -52,9 +92,8 @@ internal static class ModAudio
 
         try
         {
-            string warmup = WriteSilence();
-            if (warmup.Length > 0)
-                PlaySound(warmup, IntPtr.Zero, SndFilename | SndAsync | SndNoDefault);
+            var silence = new CachedClip(new byte[800 * 2], 8000, 1); // 0.1 s of silence
+            Playback.Start(silence.Pcm, silence.Format);
             ModLog.Info("sound effects warmed up, first activation will be audible");
         }
         catch (Exception ex)
@@ -64,27 +103,14 @@ internal static class ModAudio
     }
 
     /// <summary>
-    /// Kill any sound still playing (the 12.6 s activation sound outlives a quick exit).
-    /// SND_PURGE stops every winmm sound issued by this process — the only other user in
-    /// the game process is TLD_LanternBelt's ignite sound, an overlap too rare to matter.
+    /// Stop the activation sound only (it outlives a quick exit). Other sounds — ours and
+    /// other mods' — keep playing: each owns its own waveOut handle.
     /// </summary>
-    internal static void Stop()
-    {
-        try
-        {
-            PlaySound(null, IntPtr.Zero, SndPurge);
-        }
-        catch
-        {
-            // system interface unavailable — nothing to stop
-        }
-    }
+    internal static void Stop() => _background?.Stop();
 
-    private static void Play(string? path)
+    private static void Play(bool enter)
     {
         if (!_ready && !Prepare())
-            return;
-        if (path == null)
             return;
 
         try
@@ -93,23 +119,67 @@ internal static class ModAudio
             if (volume <= 0.001f)
                 return; // silent setting
 
-            // PlaySound has no volume argument: play a pre-scaled copy instead (cached
-            // per source file, regenerated only when the volume changes).
-            if (volume < 0.999f)
-            {
-                string scaled = ScaleTo(path, volume);
-                if (scaled.Length == 0)
-                    return;
-                path = scaled;
-            }
+            CachedClip? clip = Load(enter);
+            if (clip == null)
+                return;
 
-            if (!PlaySound(path, IntPtr.Zero, SndFilename | SndAsync | SndNoDefault))
-                ModLog.Error($"system sound playback refused: {path}");
+            byte[] pcm = volume < 0.999f ? Scale(clip.Pcm, volume) : clip.Pcm;
+            var playback = Playback.Start(pcm, clip.Format);
+
+            if (enter)
+            {
+                _background?.Stop(); // a re-entry replaces the previous activation sound
+                _background = playback;
+            }
         }
         catch (Exception ex)
         {
             ModLog.Error($"sound playback failed: {ex.Message}");
         }
+    }
+
+    private static CachedClip? Load(bool enter)
+    {
+        if (enter)
+            return _enterClip ??= Decode(_enterPath!);
+        return _markClip ??= Decode(_markPath!);
+    }
+
+    private static CachedClip? Decode(string path)
+    {
+        try
+        {
+            byte[] wav = File.ReadAllBytes(path);
+            if (!TryParse(wav, out WavInfo info))
+            {
+                ModLog.Error($"not a 16-bit PCM WAV: {path}");
+                return null;
+            }
+
+            var pcm = new byte[info.DataSize];
+            Buffer.BlockCopy(wav, info.DataAt, pcm, 0, info.DataSize);
+            return new CachedClip(pcm, info.SampleRate, info.Channels);
+        }
+        catch (Exception ex)
+        {
+            ModLog.Error($"reading {path} failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>Volume applied to the samples directly — waveOut has no per-buffer gain.</summary>
+    private static byte[] Scale(byte[] pcm, float volume)
+    {
+        var copy = new byte[pcm.Length];
+        Buffer.BlockCopy(pcm, 0, copy, 0, pcm.Length);
+        for (int i = 0; i + 1 < copy.Length; i += 2)
+        {
+            short sample = (short)(copy[i] | (copy[i + 1] << 8));
+            int scaled = Math.Clamp((int)(sample * volume), short.MinValue, short.MaxValue);
+            copy[i] = (byte)(scaled & 0xFF);
+            copy[i + 1] = (byte)((scaled >> 8) & 0xFF);
+        }
+        return copy;
     }
 
     /// <summary>Locate and validate both WAV files; reports one failure, then gives up.</summary>
@@ -129,9 +199,8 @@ internal static class ModAudio
             if (_enterPath == null || _markPath == null)
                 return Fail($"missing or invalid WAV in {dir} (expected {EnterFileName} / {MarkFileName})");
 
-            _assetDir = dir;
             _ready = true;
-            ModLog.Info("sound effects ready (system playback, Mods/DeadEye/Asset)");
+            ModLog.Info("sound effects ready (waveOut, Mods/DeadEye/Asset)");
             return true;
         }
         catch (Exception ex)
@@ -148,87 +217,149 @@ internal static class ModAudio
         return TryParse(wav, out _) ? path : null;
     }
 
-    /// <summary>A 0.1 s silent 8 kHz mono PCM16 WAV, written once into the Asset folder.</summary>
-    private static string WriteSilence()
+    private sealed class CachedClip
     {
-        string path = Path.Combine(_assetDir!, "dead-eye-warmup.wav");
-        if (File.Exists(path) && new FileInfo(path).Length > 44)
-            return path;
-
-        const int rate = 8000;
-        const int samples = 800; // 0.1 s of silence
-        using var ms = new MemoryStream();
-        using (var w = new BinaryWriter(ms))
+        internal CachedClip(byte[] pcm, int sampleRate, int channels)
         {
-            w.Write(0x46464952);             // RIFF
-            w.Write(36 + samples * 2);
-            w.Write(0x45564157);             // WAVE
-            w.Write(0x20746D66);             // "fmt "
-            w.Write(16);
-            w.Write((short)1);               // PCM
-            w.Write((short)1);               // mono
-            w.Write(rate);
-            w.Write(rate * 2);               // byte rate
-            w.Write((short)2);               // block align
-            w.Write((short)16);              // bits
-            w.Write(0x61746164);             // "data"
-            w.Write(samples * 2);
-            for (int i = 0; i < samples; i++)
-                w.Write((short)0);
+            Pcm = pcm;
+            Format = new WaveFormatEx
+            {
+                FormatTag = 1, // PCM
+                Channels = (ushort)channels,
+                SamplesPerSec = (uint)sampleRate,
+                AvgBytesPerSec = (uint)(sampleRate * channels * 2),
+                BlockAlign = (ushort)(channels * 2),
+                BitsPerSample = 16,
+                Size = 0,
+            };
         }
-        File.WriteAllBytes(path, ms.ToArray());
-        return path;
+
+        internal byte[] Pcm { get; }
+        internal WaveFormatEx Format { get; }
     }
 
-    /// <summary>Scale the data chunk by <paramref name="volume"/> into a cached sibling file.</summary>
-    private static string ScaleTo(string source, float volume)
+    /// <summary>
+    /// One playing sound: its own waveOut handle, its own buffer, its own watcher thread.
+    /// Handles are independent, so several sounds play at once without cutting each other.
+    /// </summary>
+    private sealed class Playback
     {
-        if (_scaledSource == source && Math.Abs(_scaledVolume - volume) < 0.01f &&
-            _scaledPath != null && File.Exists(_scaledPath))
-            return _scaledPath;
+        private IntPtr _handle;
+        private IntPtr _header;
+        private IntPtr _data;
+        private volatile bool _stopped;
 
-        try
+        internal static Playback Start(byte[] pcm, WaveFormatEx format)
         {
-            byte[] wav = File.ReadAllBytes(source);
-            if (!TryParse(wav, out WavInfo info))
-                return "";
-
-            var copy = (byte[])wav.Clone();
-            for (int i = info.DataAt; i + 1 < info.DataAt + info.DataSize; i += 2)
+            var playback = new Playback();
+            var thread = new Thread(() => playback.Run(pcm, format))
             {
-                short sample = (short)(copy[i] | (copy[i + 1] << 8));
-                int scaled = Math.Clamp((int)(sample * volume), short.MinValue, short.MaxValue);
-                copy[i] = (byte)(scaled & 0xFF);
-                copy[i + 1] = (byte)((scaled >> 8) & 0xFF);
-            }
-
-            string target = Path.Combine(
-                Path.GetDirectoryName(source) ?? "",
-                Path.GetFileNameWithoutExtension(source) + "_v.wav");
-            File.WriteAllBytes(target, copy);
-
-            _scaledSource = source;
-            _scaledPath = target;
-            _scaledVolume = volume;
-            return target;
+                IsBackground = true,
+                Name = "DeadEyeAudio",
+            };
+            thread.Start();
+            return playback;
         }
-        catch (Exception ex)
+
+        internal void Stop()
         {
-            ModLog.Error($"creating the volume-scaled copy failed: {ex.Message}");
-            return "";
+            _stopped = true;
+            try
+            {
+                IntPtr handle = _handle;
+                if (handle != IntPtr.Zero)
+                    waveOutReset(handle); // marks every buffer done; the thread cleans up
+            }
+            catch
+            {
+                // device already gone
+            }
+        }
+
+        private void Run(byte[] pcm, WaveFormatEx format)
+        {
+            try
+            {
+                if (waveOutOpen(out _handle, WaveMapper, ref format, IntPtr.Zero, IntPtr.Zero, 0) != 0)
+                {
+                    _handle = IntPtr.Zero;
+                    return;
+                }
+
+                _data = Marshal.AllocHGlobal(pcm.Length);
+                Marshal.Copy(pcm, 0, _data, pcm.Length);
+
+                int headerSize = Marshal.SizeOf<WaveHdr>();
+                _header = Marshal.AllocHGlobal(headerSize);
+                var header = new WaveHdr { Data = _data, BufferLength = (uint)pcm.Length };
+                Marshal.StructureToPtr(header, _header, false);
+
+                waveOutPrepareHeader(_handle, _header, headerSize);
+                waveOutWrite(_handle, _header, headerSize);
+
+                while (!_stopped)
+                {
+                    var current = Marshal.PtrToStructure<WaveHdr>(_header);
+                    if ((current.Flags & WhdrDone) != 0)
+                        break;
+                    Thread.Sleep(20);
+                }
+            }
+            catch (Exception ex)
+            {
+                ModLog.Error($"waveOut playback failed: {ex.Message}");
+            }
+            finally
+            {
+                Cleanup();
+            }
+        }
+
+        private void Cleanup()
+        {
+            try
+            {
+                int headerSize = Marshal.SizeOf<WaveHdr>();
+                if (_handle != IntPtr.Zero)
+                {
+                    waveOutReset(_handle);
+                    if (_header != IntPtr.Zero)
+                        waveOutUnprepareHeader(_handle, _header, headerSize);
+                    waveOutClose(_handle);
+                    _handle = IntPtr.Zero;
+                }
+                if (_header != IntPtr.Zero)
+                {
+                    Marshal.FreeHGlobal(_header);
+                    _header = IntPtr.Zero;
+                }
+                if (_data != IntPtr.Zero)
+                {
+                    Marshal.FreeHGlobal(_data);
+                    _data = IntPtr.Zero;
+                }
+            }
+            catch
+            {
+                // nothing sensible to do while tearing down
+            }
         }
     }
 
     private readonly struct WavInfo
     {
-        internal WavInfo(int dataAt, int dataSize)
+        internal WavInfo(int dataAt, int dataSize, int sampleRate, int channels)
         {
             DataAt = dataAt;
             DataSize = dataSize;
+            SampleRate = sampleRate;
+            Channels = channels;
         }
 
         internal int DataAt { get; }
         internal int DataSize { get; }
+        internal int SampleRate { get; }
+        internal int Channels { get; }
     }
 
     /// <summary>RIFF/WAVE parser: 16-bit PCM only.</summary>
@@ -255,7 +386,7 @@ internal static class ModAudio
                 int len = size > 0 && at + size <= wav.Length ? size : wav.Length - at;
                 if (channels <= 0 || sampleRate <= 0 || bits != 16 || len <= 0)
                     return false;
-                info = new WavInfo(at, len);
+                info = new WavInfo(at, len, sampleRate, channels);
                 return true;
             }
             pos += 8 + size + (size & 1); // chunks are word-aligned

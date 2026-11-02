@@ -80,6 +80,16 @@ internal static class DeadEyeManager
     internal static Vector3? LastShotAimPoint
         => Time.unscaledTime <= _aimPointExpiry ? _lastAimPoint : null;
 
+    /// <summary>
+    /// The animal the shot about to leave the barrel should chase. Consumed synchronously
+    /// by the AdaptiveArsenal Fire prefix (registration), then cleared — null when the
+    /// homing setting is off, which leaves the projectile on its ballistic path.
+    /// </summary>
+    internal static GameObject? PendingHomingTarget;
+
+    /// <summary>Body point offset (animal local space) that goes with <see cref="PendingHomingTarget"/>.</summary>
+    internal static Vector3 PendingHomingOffset;
+
     /// <summary>Aim point for the camera driver while the firing sequence runs (null otherwise).</summary>
     internal static Vector3? CurrentAimPoint
     {
@@ -99,6 +109,10 @@ internal static class DeadEyeManager
         // The authoritative re-assertion runs from the InterfaceManager.Update POSTFIX
         // (Patches.TimeScaleGuardPatch), i.e. after TimeAccelerator's prefix stomps it.
         TimeScaler.Advance();
+
+        // Steer any bullet that is still chasing its mark. Runs in every state: a shot can
+        // still be in the air after the sequence has ended.
+        HomingSteering.Tick();
 
         // Warm the audio subsystem up during normal gameplay, long before the first
         // activation — the first winmm sound a process issues would otherwise be swallowed.
@@ -351,7 +365,12 @@ internal static class DeadEyeManager
         // returns, the shot is committed. The scaled gate is neutralized first (our
         // unscaled pacing above is authoritative under the slowdown).
         shooter.m_NextAllowedFireTime = Time.time;
+        // Tell the projectile patch what to chase: the animal itself, so the bullet corrects
+        // in flight instead of relying on the lead prediction being perfect.
+        PendingHomingTarget = DeadEyeMod.Settings?.HomingBullets == true ? mark.Ai.gameObject : null;
+        PendingHomingOffset = mark.LocalOffset;
         shooter.Fire();
+        PendingHomingTarget = null; // consumed synchronously by the Fire prefix
         // The interval Fire() pushes onto the gate is the vanilla fire rate expressed in
         // SCALED seconds (vanilla always runs at scale 1, so the number IS the real
         // interval). Left alone under the execution slowdown the game would advance only
@@ -565,6 +584,7 @@ internal static class DeadEyeManager
     /// <summary>Scene change / menu hard reset.</summary>
     internal static void HardReset()
     {
+        HomingSteering.Clear(); // in-flight bullets do not survive a scene load
         if (TimeScaler.Owned || State != DeadEyeState.Inactive)
             ForceExit("hard reset");
     }

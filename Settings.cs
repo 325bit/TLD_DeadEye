@@ -16,6 +16,12 @@ internal class Settings : JsonModSettings
     [Choice("左轮手枪", "猎人的左轮手枪", "护林人的左轮手枪", "典狱长的左轮手枪")]
     public int BoundRevolver = 0;
 
+    [Section("弹道")]
+
+    [Name("子弹追踪")]
+    [Description("处决时射出的子弹会一路修正方向、追着标记目标飞（需要安装 AdaptiveArsenal；原版弹道在出膛瞬间结算，无法追踪）。关掉则退回「出膛即锁定提前量」的旧行为。")]
+    public bool HomingBullets = true;
+
     [Section("按键")]
 
     [Name("进入 / 退出死神之眼")]

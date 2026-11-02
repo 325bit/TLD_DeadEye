@@ -2,7 +2,7 @@
 
 [English](#english) · [中文](#中文)
 
-![version](https://img.shields.io/badge/version-0.5.8-informational)
+![version](https://img.shields.io/badge/version-0.6.0-informational)
 
 ![game](https://img.shields.io/badge/The%20Long%20Dark-2.55-success)
 
@@ -27,7 +27,7 @@ A The Long Dark mod that slows the world down, lets you mark animals like RDR2's
 **The execution**
 
 - Press the side mouse button again — time returns to normal, the mod draws your revolver if it was not in hand, and the view swings onto the first mark through the game's own cinematic look-at system. Once the crosshair has swung onto it the sequence opens fire at the weapon's own full rate, one shot per mark, while the view keeps sweeping smoothly from target to target — the swing is paced to the weapon's fire rate, arriving at each mark just as its shot is due.
-- Each projectile is redirected the instant it spawns onto a lead-predicted intercept point — where the animal will be when the shot arrives, computed from its tracked movement and the revolver's launch speed (gravity included) — so head marks hit heads and body marks hit bodies even on running targets. The game's own damage, bleed-out, critical-hit and skill-progress rules all apply unchanged.
+- Each projectile is redirected the instant it spawns onto a lead-predicted intercept point — where the animal will be when the shot arrives, computed from its tracked movement and the revolver's launch speed (gravity included) — so head marks hit heads and body marks hit bodies even on running targets. The game's own damage, bleed-out, critical-hit and skill-progress rules all apply unchanged. With AdaptiveArsenal installed the bullet also keeps steering onto the animal during flight, so a slightly-off lead still lands.
 - Fatigue drains a configurable percentage of the full bar per real-time second (default 1%, ~100 s from full), and returns to normal the moment it ends — if you run out of stamina mid-mode, it shuts off by itself, and a fully exhausted survivor cannot enter the mode at all.
 
 **Bound weapon**
@@ -61,6 +61,7 @@ Settings live under **Options → Mod Settings → Dead Eye (死神之眼)**.
 | Setting | Effect | Default |
 |---|---|---|
 | 绑定的左轮手枪 | Picks which revolver triggers the mode; the other three are ignored by it | 左轮手枪 |
+| 子弹追踪 | The execution's bullets keep steering toward the marked animal while in flight (needs AdaptiveArsenal; the vanilla projectile resolves its hit at spawn) | On |
 | 进入 / 退出死神之眼 | Key that starts and ends the mode; click the box and press any key or mouse button to rebind | 鼠标后侧键 |
 | 标记目标 | Key that marks what is under the crosshair; rebindable the same way | 鼠标中键 |
 | 处决时间流速 | World speed during the firing phase (the yellow tint persists, your own fire rate stays normal). Very low values also stretch the game's own weapon state machine, so keep it at 0.4 or above; 1 = no slowdown | 0.8 |
@@ -82,7 +83,7 @@ The defaults aim for an RDR2 feel: a quick 0.1x draw reveal, then a near-frozen 
 
 - Responds only while a save is loaded and the gameplay HUD is up; in menus the keys have no effect and no time-scale change is ever left behind.
 - Does not modify item definitions, weapon stats or save files. While the mode is on, Dead Eye owns the time-scale value: other mods that also drive the game speed (for example TimeAccelerator, which resets the scale every frame from an interface-update prefix) take over again the moment Dead Eye ends, because this mod's re-assertion runs after theirs.
-- The sounds are two plain `.wav` files under `Mods/DeadEye/Asset`, played through the Windows system audio interface (`winmm!PlaySound`) — no game audio banks (Wwise) are touched and no Unity audio components are created.
+- The sounds are two plain `.wav` files under `Mods/DeadEye/Asset`, played through the Windows audio interface (`winmm!waveOut`) — each sound owns its own device handle, so the mark chime and the activation sound can overlap freely. No game audio banks (Wwise) are touched and no Unity audio components are created.
 - **AdaptiveArsenal compatible**: detected automatically (with or without it, shots land on the marked point).
 
 ### FAQ
@@ -122,7 +123,7 @@ MIT — see [LICENSE](LICENSE).
 **处决**
 
 - 再按一次鼠标后侧键——**结束标记环节，直接进入处决**：黄色滤镜与时间放慢一直持续到处决结束（若一个都没标，同一按键则立刻结束死神之眼）。左轮在进入标记时就已经拔出。视角通过游戏自带的过场演出视角系统先甩向第一个标记；准星到位后立刻以武器原生满射速逐个开火，视角在目标之间如「甩枪」般连续平滑掠过——甩动节奏与射速匹配。**放慢只作用于世界：人物自身的拔枪、开火动作与射速都以正常速率进行。**
-- 每发弹丸在出膛瞬间被重定向到**提前量拦截点**——根据动物当前移动速度与左轮出膛速度（含重力下坠）计算「子弹到达时它会在哪」——所以奔跑中的目标也能标头打头、标身打身。游戏自己的伤害、失血、要害判定和技能经验全部原样生效。
+- 每发弹丸在出膛瞬间被重定向到**提前量拦截点**——根据动物当前移动速度与左轮出膛速度（含重力下坠）计算「子弹到达时它会在哪」——所以奔跑中的目标也能标头打头、标身打身。游戏自己的伤害、失血、要害判定和技能经验全部原样生效；装了自适应兵工厂时，子弹还会在飞行途中持续修正方向追着它走，提前量稍有偏差也能命中。
 - 标记期间疲劳按真实时间每秒消耗总量的一定百分比（默认 1%，满疲劳约 100 秒耗空），结束立刻恢复——中途力竭会自动收招，完全力竭时根本进不了模式。
 
 **绑定武器**
@@ -156,6 +157,7 @@ MIT — see [LICENSE](LICENSE).
 | 项 | 说明 | 默认 |
 |---|---|---|
 | 绑定的左轮手枪 | 选择哪把左轮能触发模式；其余三把不会被它响应 | 左轮手枪 |
+| 子弹追踪 | 处决射出的子弹会一路修正方向追着标记目标飞（需要 AdaptiveArsenal；原版弹道在出膛瞬间结算） | 开 |
 | 进入 / 退出死神之眼 | 开启和结束模式的键；点输入框再按任意键或鼠标键可重绑 | 鼠标后侧键 |
 | 标记目标 | 把准星下的目标标记下来的键；重绑方式相同 | 鼠标中键 |
 | 处决时间流速 | 处决期间的世界流速（黄滤镜延续，人物开火保持正常速率）。过低的值会连带拖慢游戏自身的持枪状态机，建议 ≥0.4；1 = 不放慢 | 0.8 |
@@ -177,7 +179,7 @@ MIT — see [LICENSE](LICENSE).
 
 - 只在读档后、游戏 HUD 可用时响应；在菜单里按键无效果，也不会留下任何时间流速残留。
 - 不修改物品定义、武器数值与存档文件。模式开启期间由它独占时间流速：其它同样接管游戏速度的 mod（例如每帧重置流速的 TimeAccelerator）会在死神之眼结束后自动接管回来，因为本 mod 的重申发生在它们之后。
-- 音效是 `Mods/DeadEye/Asset` 下的两个普通 `.wav` 文件，通过 Windows 系统音频接口（`winmm!PlaySound`）播放——不触碰游戏音频库（Wwise），也不创建任何 Unity 音频组件。
+- 音效是 `Mods/DeadEye/Asset` 下的两个普通 `.wav` 文件，通过 Windows 音频接口（`winmm!waveOut`）播放——每个音效独占一个播放通道，标记音与启动音可以同时响、互不打断；不触碰游戏音频库（Wwise），也不创建任何 Unity 音频组件。
 - **与 AdaptiveArsenal 兼容**：自动探测有无该 mod，两种弹道下射击都落在标记点上。
 
 ### 常见问题

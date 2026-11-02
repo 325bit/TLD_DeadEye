@@ -1,5 +1,15 @@
 # ChangeLog
 
+## 0.6.0
+
+- **Homing bullets.** With AdaptiveArsenal installed, every projectile fired by the execution sequence now keeps steering toward its marked animal while in flight (new setting 子弹追踪, default on). The Fire prefix registers the projectile's Rigidbody together with that mark's GameObject and body offset; each tick the velocity direction is rotated toward the mark's CURRENT position (up to 220 deg/s, speed preserved), so the lead prediction is only the starting guess and a slightly-off lead still lands. Each bullet keeps its own target — an in-flight round never retargets when the sequence advances to the next mark. Turning runs on scaled time so the bullet behaves correctly under the execution slowdown.
+- The vanilla `vp_Bullet` resolves its hit inside `Start()` and has no physics body to steer, so homing applies to the AdaptiveArsenal path only; without it the previous ballistic behavior is unchanged.
+
+## 0.5.9
+
+- **The mark chime no longer cuts the activation sound.** Both sounds used `winmm!PlaySound`, which has a single channel per process, so every mark stopped the 12.6 s activation sound. They now go through `winmm!waveOut` with one device handle per sound: sounds overlap freely, and `Stop()` only resets the activation handle it owns — other mods' sounds (e.g. TLD_LanternBelt's ignite click) are no longer purged either.
+- Volume is now applied by scaling the decoded samples in memory, so the mod no longer writes `*_v.wav` copies next to the assets (existing ones can be deleted).
+
 ## 0.5.8
 
 - The draw-reveal timing is no longer tunable: 拔枪秒流速 and 拔枪特写时长 are gone, fixed at **0.1x for 0.7 s** (constants `RevealTimeScale` / `RevealSeconds`). After the reveal the marking phase runs at the fixed 0.01x.

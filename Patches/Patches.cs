@@ -163,6 +163,19 @@ internal static class AdaptiveProjectileRedirectPatch
                 return;
 
             component.transform.rotation = Quaternion.LookRotation(toMark.normalized);
+
+            // Homing: hand this projectile to the steering list with the animal it should
+            // chase, so it keeps correcting after launch (lead prediction is only the
+            // starting guess once steering is on).
+            var target = DeadEye.Core.DeadEyeManager.PendingHomingTarget;
+            if (target != null)
+            {
+                var body = component.GetComponent<Rigidbody>();
+                if (body != null)
+                    DeadEye.Core.HomingSteering.Register(
+                        body, target, DeadEye.Core.DeadEyeManager.PendingHomingOffset);
+            }
+
             ModLog.Debug("AdaptiveArsenal projectile aimed onto the mark");
         }
         catch (System.Exception ex)

@@ -26,6 +26,9 @@ internal sealed class Mark
 
     internal BaseAi Ai => _ai;
 
+    /// <summary>Body point offset in the animal's local space (used by the homing bullets).</summary>
+    internal Vector3 LocalOffset => _localOffset;
+
     internal bool IsAlive => _ai != null && _ai.gameObject != null && _ai.GetAiMode() != AiMode.Dead;
 
     internal bool TryGetWorldPoint(out Vector3 worldPoint)
