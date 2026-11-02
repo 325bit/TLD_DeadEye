@@ -109,6 +109,8 @@ internal static class DeadEyeManager
     /// the live velocity every frame and only falls back to this when the animal is unreadable.
     /// </summary>
     internal static Vector3 PendingHomingVelocity;
+    /// <summary>World speed this shot's round must fly at, slow-motion compensation included.</summary>
+    internal static float PendingLaunchSpeed;
 
     /// <summary>Aim point for the camera driver while the firing sequence runs (null otherwise).</summary>
     internal static Vector3? CurrentAimPoint
@@ -468,7 +470,8 @@ internal static class DeadEyeManager
         // one input the player can change live.
         Vector3 markedPoint = mark.TryGetWorldPoint(out Vector3 mp) ? mp : aimPoint;
         ModLog.Info($"shot {_fireIndex + 1}/{_marks.Count} fired ({(mark.IsSmallPrey ? "small prey" : "large animal")}, " +
-                    $"v {mark.Velocity.magnitude:F1} m/s [{mark.VelocitySource}], flight {flightTime * 1000f:F0} ms, " +
+                    $"v {mark.Velocity.magnitude:F1} m/s [{mark.VelocitySource}], bullet {PendingLaunchSpeed:F0} m/s, " +
+                    $"flight {flightTime * 1000f:F0} ms, " +
                     $"lead {(intercept - aimPoint).magnitude:F2} m, aim {(aimPoint - markedPoint).magnitude:F2} m from the mark" +
                     $"{(mark.IsSmallPrey ? $", fraction {AnimalBody.PreyAimFraction:F2}" : string.Empty)}, " +
                     $"next in {intervalReal / rate:F2}s real{(rate > 1f ? $" (x{rate:F0})" : string.Empty)})");
@@ -484,9 +487,38 @@ internal static class DeadEyeManager
     {
         var camera = GameManager.GetMainCamera();
         Vector3 muzzlePos = camera != null ? camera.transform.position : GameManager.GetPlayerTransform().position;
-        float launchSpeed = Ballistics.MuzzleVelocityFor(
+        float launchSpeed = CompensatedLaunchSpeed(
             GameManager.GetVpFPSCamera()?.CurrentShooter?.m_Weapon?.m_GunItem?.name);
+        // Published for the round: HomingSteering forces the projectile to this speed on its
+        // first live frame. Computed here because this is the last call before Fire().
+        PendingLaunchSpeed = launchSpeed;
         return Ballistics.PredictIntercept(muzzlePos, aimPoint, mark.Velocity, launchSpeed, out flightTime);
+    }
+
+    /// <summary>
+    /// The launch speed a Dead Eye round actually flies at. The world runs at
+    /// <see cref="Time.timeScale"/> during the execution, so a bullet at the table speed looks
+    /// 1/scale times slower than a normal shot; the speed is raised by exactly that factor — and
+    /// capped at <see cref="HomingSteering.MaxCoveredSpeed"/>, because beyond it the swept hit
+    /// test can no longer sample the whole segment and would start missing animals it flies
+    /// through. The lead prediction MUST use this same value or every shot misses by the ratio.
+    /// </summary>
+    private static float CompensatedLaunchSpeed(string? gunName)
+    {
+        float baseSpeed = Ballistics.MuzzleVelocityFor(gunName);
+        if (baseSpeed < 1f)
+            return baseSpeed;
+
+        float scale = Mathf.Clamp(Time.timeScale, 0.05f, 1f);
+        float wanted = 1f / scale;
+        float ceiling = Mathf.Max(1f, HomingSteering.MaxCoveredSpeed / baseSpeed);
+        float applied = Mathf.Max(1f, Mathf.Min(wanted, ceiling));
+
+        if (wanted > ceiling + 0.01f)
+            ModLog.Debug($"launch speed capped at x{ceiling:F2} ({baseSpeed * ceiling:F0} m/s): " +
+                         $"x{wanted:F2} would outrun the swept hit test");
+
+        return baseSpeed * applied;
     }
 
     // ---------------------------------------------------------------- Enter / exit

@@ -22,7 +22,7 @@ internal static class HomingSteering
     private const float ResidualDegrees = 0.5f;    // per frame: heading drift away from the commanded velocity
     private const float ResidualMinSpeed = 30f;    // below this the round is dying and the frame timing dominates
     private const float SampleSpacing = 0.25f;    // tube-test interval: consecutive r=0.1 spheres overlap without gaps
-    private const int MaxPathSamples = 48;        // cap on tube-test samples per swept segment (6 m/step covers it)
+    private const int MaxPathSamples = 128;       // cap on tube-test samples: 0.25 m x 127 = 32 m of swept segment
     private const int TraceLimit = 8;             // distances kept per round (first 7, then the latest)
 
     private sealed class Entry
@@ -38,11 +38,13 @@ internal static class HomingSteering
         internal Vector3 SpawnPosition;  // muzzle position at Register: the run the damage falloff is measured on
         internal float AimHeight;
         internal bool SmallPrey;
+        internal float LaunchSpeed;      // world speed this round must fly at (slow-motion compensated)
         internal bool Resolved;          // the hit was applied by this mod; the round is torn down
         internal string ResolutionReason = "resolved on hit"; // report label: hit vs scenery
         internal float CreatedAt;
         internal float ExpiresAt;
         internal bool Aligned;
+        internal bool SpeedForced;       // the launch speed planned at the fire moment has been applied
 
         // Command-residual bookkeeping, see CheckCommandResidual.
         internal Vector3 Commanded;
@@ -81,7 +83,7 @@ internal static class HomingSteering
     private static readonly List<Entry> _entries = new();
 
     internal static void Register(Rigidbody body, GameObject target, Vector3 bodyOffset, bool smallPrey,
-                                  Vector3 targetVelocity)
+                                  Vector3 targetVelocity, float launchSpeed)
     {
         float now = Time.unscaledTime;
         var entry = new Entry
@@ -97,6 +99,7 @@ internal static class HomingSteering
             SpawnPosition = body.transform.position,
             AimHeight = AnimalBody.LargeAimHeight(bodyOffset),
             SmallPrey = smallPrey,
+            LaunchSpeed = launchSpeed,
             CreatedAt = now,
             ExpiresAt = now + LifetimeSeconds,
         };
@@ -134,6 +137,15 @@ internal static class HomingSteering
             return false;
         }
     }
+
+    /// <summary>
+    /// Fastest round the tube test can still cover. The swept segment between two observed
+    /// positions is one physics step of world travel, so the budget is expressed in metres and
+    /// divided by the step — with anything faster the test would sample only the front of the
+    /// segment and miss the animals further along it.
+    /// </summary>
+    internal static float MaxCoveredSpeed
+        => SampleSpacing * (MaxPathSamples - 1) * 0.8f / Mathf.Max(0.001f, Time.fixedDeltaTime);
 
     /// <summary>
     /// Colliders belonging to the animal, cached once: the pass test raycasts against these
@@ -450,6 +462,26 @@ internal static class HomingSteering
     }
 
     /// <summary>
+    /// Sets the round's world speed to the one planned at the fire moment, so the execution's
+    /// slow motion does not also slow the bullet on screen. Applied on the first frame the
+    /// round is seen moving rather than in the Fire patch: AdaptiveArsenal commits its launch
+    /// with AddForce (which the projectile only picks up a step later), so this is the first
+    /// place the mod can see — and overwrite — the actual velocity. Direction is kept.
+    /// </summary>
+    private static float ForceLaunchSpeed(Entry entry, Vector3 velocity, float speed)
+    {
+        entry.SpeedForced = true;
+
+        float target = entry.LaunchSpeed;
+        if (target < 1f || speed < 0.001f)
+            return speed;
+
+        entry.Body.velocity = velocity / speed * target;
+        ModLog.Debug($"homing launch speed {speed:F0} -> {target:F0} m/s");
+        return target;
+    }
+
+    /// <summary>
     /// Compares the velocity the game reports with the one this mod wrote last frame, plus the
     /// gravity it must have picked up. Gravity is a KNOWN quantity, and it only turns a 299 m/s
     /// round at ~1.9 deg/s — two orders below the threshold — so subtracting it lets the test
@@ -746,6 +778,12 @@ internal static class HomingSteering
                 float speed = velocity.magnitude;
                 if (speed < MinSpeed)
                     continue; // still waiting for AdaptiveArsenal's launch force to land
+
+                if (!entry.SpeedForced)
+                {
+                    speed = ForceLaunchSpeed(entry, velocity, speed);
+                    velocity = entry.Body.velocity;
+                }
 
                 CheckCommandResidual(entry, velocity, speed);
 

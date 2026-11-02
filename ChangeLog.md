@@ -1,5 +1,13 @@
 # ChangeLog
 
+## 0.7.11
+
+- **The bullets no longer crawl when the execution is slowed right down.** At 处决时间流速 0.1 the world runs ten times slower, so a 300 m/s round covers just 30 m/s of screen distance: a 60 m shot took **2.0 s** of real time to land (the 120 m shot measured 4.05 s). The launch speed is now multiplied by `1 / Time.timeScale`, so a round crosses the gap at a normal-looking pace.
+- **Capped at what the hit detection can still follow.** The swept hit test samples the segment between two observed positions, and that segment is one physics step of world travel — so the speed is clamped at `SampleSpacing x (MaxPathSamples - 1) x 0.8 / fixedDeltaTime`. `MaxPathSamples` went from 48 to 128 (0.25 m x 127 = 32 m of coverage) which moves that ceiling to ~760 m/s, i.e. **2.5x** at the revolver's 300 m/s — a 60 m shot now takes 0.79 s instead of 2.0 s. Raising it further needs the sampling replaced by a single sphere sweep, or hits start being missed.
+- **The lead prediction uses the same number.** `ComputeIntercept` now computes the compensated speed and stores it on the round, so the intercept, the gravity drop, the reported `flight` time and the actual projectile all agree — using the table speed while the bullet flew faster would have shortened every lead by the same ratio.
+- The speed is applied on the round's FIRST live frame rather than inside `ProjectileItem.Fire`: AdaptiveArsenal commits its launch with `AddForce`, which the projectile only picks up a physics step later, so a Fire postfix reads zero velocity. Direction is preserved; the shot log now prints `bullet N m/s`.
+- Requires 子弹追踪 to be on — the adjustment rides the homing entry, so with homing disabled the round keeps the table speed. The cap and the applied speed are logged (`launch speed capped at x2.54`).
+
 ## 0.7.10
 
 - **New detector: a round that turns further than the steering commanded.** Each frame the velocity the game reports is compared with the vector this mod wrote one frame earlier, plus the gravity it must have picked up in between. Gravity is a known quantity and only turns a 299 m/s round at ~1.9 deg/s, so subtracting it lets the test sit at **0.5 deg per frame** — 15x above what gravity can do in a 17 ms frame, and 10-40x below a real steering correction — without ever flagging a falling round. Anything left over means something OTHER than steering moved the round: a bounce, a teleport, or a jumping aim point.
