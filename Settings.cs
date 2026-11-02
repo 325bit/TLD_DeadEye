@@ -23,8 +23,8 @@ internal class Settings : JsonModSettings
     public bool HomingBullets = true;
 
     [Name("追踪强度")]
-    [Description("子弹飞行中转向追踪标记的力度。1 = 标准；调大转得更急、更容易命中高速横移的目标，弹道弯折也更明显；调小则更接近直射。")]
-    [Slider(0.5f, 10.0f)]
+    [Description("子弹飞行中转向追踪标记的力度。1 = 标准；越低弹道越直（0.05 几乎不打弯），越高转得越急、越能咬住高速横移的目标。")]
+    [Slider(0.05f, 10f)]
     public float HomingStrength = 1f;
 
     [Section("按键")]

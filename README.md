@@ -2,7 +2,7 @@
 
 [English](#english) · [中文](#中文)
 
-![version](https://img.shields.io/badge/version-0.6.2-informational)
+![version](https://img.shields.io/badge/version-0.6.3-informational)
 
 ![game](https://img.shields.io/badge/The%20Long%20Dark-2.55-success)
 
@@ -62,7 +62,7 @@ Settings live under **Options → Mod Settings → Dead Eye (死神之眼)**.
 |---|---|---|
 | 绑定的左轮手枪 | Picks which revolver triggers the mode; the other three are ignored by it | 左轮手枪 |
 | 子弹追踪 | The execution's bullets keep steering toward the marked animal while in flight (needs AdaptiveArsenal; the vanilla projectile resolves its hit at spawn) | On |
-| 追踪强度 | How hard the tracking pulls: 1 is standard, higher turns faster (better on fast crossing targets, more visible curve), lower flies straighter | 1 |
+| 追踪强度 | How hard the tracking pulls: 1 is standard; lower flies straighter (0.05 barely curves at all), higher turns harder and holds fast crossing targets | 1 |
 | 进入 / 退出死神之眼 | Key that starts and ends the mode; click the box and press any key or mouse button to rebind | 鼠标后侧键 |
 | 标记目标 | Key that marks what is under the crosshair; rebindable the same way | 鼠标中键 |
 | 处决时间流速 | World speed during the firing phase (the yellow tint persists, your own fire rate stays normal). Very low values also stretch the game's own weapon state machine, so keep it at 0.4 or above; 1 = no slowdown | 0.8 |
@@ -159,7 +159,7 @@ MIT — see [LICENSE](LICENSE).
 |---|---|---|
 | 绑定的左轮手枪 | 选择哪把左轮能触发模式；其余三把不会被它响应 | 左轮手枪 |
 | 子弹追踪 | 处决射出的子弹会一路修正方向追着标记目标飞（需要 AdaptiveArsenal；原版弹道在出膛瞬间结算） | 开 |
-| 追踪强度 | 追踪力度：1 为标准，调大转得更急（打高速横移更稳、弹道弯折更明显），调小更接近直射 | 1 |
+| 追踪强度 | 追踪力度：1 为标准；越低弹道越直（0.05 几乎不打弯），越高转得越急、越能咬住高速横移的目标 | 1 |
 | 进入 / 退出死神之眼 | 开启和结束模式的键；点输入框再按任意键或鼠标键可重绑 | 鼠标后侧键 |
 | 标记目标 | 把准星下的目标标记下来的键；重绑方式相同 | 鼠标中键 |
 | 处决时间流速 | 处决期间的世界流速（黄滤镜延续，人物开火保持正常速率）。过低的值会连带拖慢游戏自身的持枪状态机，建议 ≥0.4；1 = 不放慢 | 0.8 |

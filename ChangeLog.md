@@ -1,5 +1,12 @@
 # ChangeLog
 
+## 0.6.3
+
+- **The visible "hard turn" was largely a jumping aim point, not the turn rate.** The bullet aimed at the mark's local-space body point, which sweeps sideways whenever the animal turns on the spot — the bullet then chased that jump. It now aims at the target ROOT plus a height (taken from the mark), so the point only translates when the animal actually moves.
+- Corrections are split over many frames: each tick turns only 40 % of the remaining angle (still capped by the strength-derived turn rate), so the path reads as a smooth curve instead of a straight line with a kink.
+- 追踪强度 range widened to **0.05-10** (was 0.5-2.5): at 0.05 the turn rate is ~20 deg/s, i.e. a 300 m/s bullet curves over a radius of hundreds of metres and the shot looks straight; 1 is the previous standard (400 deg/s).
+- New verbose line `homing engaged: initial error X deg, speed Y m/s, strength Z` — if the initial error is large, the curve you see is the SPAWN direction being off, not the steering, and the fix belongs in the lead prediction.
+
 ## 0.6.2
 
 - Back to PURE pursuit (aim at the animal's current body point) so the 追踪强度 setting alone decides hit rate versus look — no lead term confounding the comparison. The strength setting is kept and now scales the turn ceiling around a 400 deg/s base (0.5 -> 200 deg/s, 2.5 -> 1000 deg/s).
