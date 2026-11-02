@@ -166,14 +166,15 @@ internal static class AdaptiveProjectileRedirectPatch
 
             // Homing: hand this projectile to the steering list with the animal it should
             // chase, so it keeps correcting after launch (lead prediction is only the
-            // starting guess once steering is on).
+            // starting guess once steering is on). Small prey converge on the body centre.
             var target = DeadEye.Core.DeadEyeManager.PendingHomingTarget;
             if (target != null)
             {
                 var body = component.GetComponent<Rigidbody>();
                 if (body != null)
                     DeadEye.Core.HomingSteering.Register(
-                        body, target, DeadEye.Core.DeadEyeManager.PendingHomingOffset);
+                        body, target, DeadEye.Core.DeadEyeManager.PendingHomingOffset,
+                        DeadEye.Core.DeadEyeManager.PendingHomingSmallPrey);
             }
 
             ModLog.Debug("AdaptiveArsenal projectile aimed onto the mark");

@@ -2,7 +2,7 @@
 
 [English](#english) · [中文](#中文)
 
-![version](https://img.shields.io/badge/version-0.6.3-informational)
+![version](https://img.shields.io/badge/version-0.6.5-informational)
 
 ![game](https://img.shields.io/badge/The%20Long%20Dark-2.55-success)
 
@@ -27,7 +27,7 @@ A The Long Dark mod that slows the world down, lets you mark animals like RDR2's
 **The execution**
 
 - Press the side mouse button again — time returns to normal, the mod draws your revolver if it was not in hand, and the view swings onto the first mark through the game's own cinematic look-at system. Once the crosshair has swung onto it the sequence opens fire at the weapon's own full rate, one shot per mark, while the view keeps sweeping smoothly from target to target — the swing is paced to the weapon's fire rate, arriving at each mark just as its shot is due.
-- Each projectile is redirected the instant it spawns onto a lead-predicted intercept point — where the animal will be when the shot arrives, computed from its tracked movement and the revolver's launch speed (gravity included) — so head marks hit heads and body marks hit bodies even on running targets. The game's own damage, bleed-out, critical-hit and skill-progress rules all apply unchanged. With AdaptiveArsenal installed the bullet also keeps steering onto the animal during flight, so a slightly-off lead still lands.
+- Each projectile is redirected the instant it spawns onto a lead-predicted intercept point — where the animal will be when the shot arrives, computed from its tracked movement and the revolver's launch speed (gravity included) — so head marks hit heads and body marks hit bodies even on running targets. The game's own damage, bleed-out, critical-hit and skill-progress rules all apply unchanged. With AdaptiveArsenal installed the bullet also keeps steering onto the animal during flight, so a slightly-off lead still lands. Grouse and rabbits are the exception: whatever part you mark, the shot converges on a point INSIDE their body — a body that small dies to any hit, and an aim point sitting on the visible surface puts half of any error outside the animal.
 - Fatigue drains a configurable percentage of the full bar per real-time second (default 1%, ~100 s from full), and returns to normal the moment it ends — if you run out of stamina mid-mode, it shuts off by itself, and a fully exhausted survivor cannot enter the mode at all.
 
 **Bound weapon**
@@ -61,7 +61,7 @@ Settings live under **Options → Mod Settings → Dead Eye (死神之眼)**.
 | Setting | Effect | Default |
 |---|---|---|
 | 绑定的左轮手枪 | Picks which revolver triggers the mode; the other three are ignored by it | 左轮手枪 |
-| 子弹追踪 | The execution's bullets keep steering toward the marked animal while in flight (needs AdaptiveArsenal; the vanilla projectile resolves its hit at spawn) | On |
+| 子弹追踪 | The execution's bullets keep steering toward the marked animal while in flight (needs AdaptiveArsenal; the vanilla projectile resolves its hit at spawn). Grouse and rabbits are aimed inside the body, so the marked part does not matter | On |
 | 追踪强度 | How hard the tracking pulls: 1 is standard; lower flies straighter (0.05 barely curves at all), higher turns harder and holds fast crossing targets | 1 |
 | 进入 / 退出死神之眼 | Key that starts and ends the mode; click the box and press any key or mouse button to rebind | 鼠标后侧键 |
 | 标记目标 | Key that marks what is under the crosshair; rebindable the same way | 鼠标中键 |
@@ -124,7 +124,7 @@ MIT — see [LICENSE](LICENSE).
 **处决**
 
 - 再按一次鼠标后侧键——**结束标记环节，直接进入处决**：黄色滤镜与时间放慢一直持续到处决结束（若一个都没标，同一按键则立刻结束死神之眼）。左轮在进入标记时就已经拔出。视角通过游戏自带的过场演出视角系统先甩向第一个标记；准星到位后立刻以武器原生满射速逐个开火，视角在目标之间如「甩枪」般连续平滑掠过——甩动节奏与射速匹配。**放慢只作用于世界：人物自身的拔枪、开火动作与射速都以正常速率进行。**
-- 每发弹丸在出膛瞬间被重定向到**提前量拦截点**——根据动物当前移动速度与左轮出膛速度（含重力下坠）计算「子弹到达时它会在哪」——所以奔跑中的目标也能标头打头、标身打身。游戏自己的伤害、失血、要害判定和技能经验全部原样生效；装了自适应兵工厂时，子弹还会在飞行途中持续修正方向追着它走，提前量稍有偏差也能命中。
+- 每发弹丸在出膛瞬间被重定向到**提前量拦截点**——根据动物当前移动速度与左轮出膛速度（含重力下坠）计算「子弹到达时它会在哪」——所以奔跑中的目标也能标头打头、标身打身。游戏自己的伤害、失血、要害判定和技能经验全部原样生效；装了自适应兵工厂时，子弹还会在飞行途中持续修正方向追着它走，提前量稍有偏差也能命中。松鸡和兔子是例外：无论你标的是哪个部位，子弹都朝**身体内部**收束——这么小的目标挨一发就死，而瞄准点如果贴在它可见的表面上，任何偏差都有一半落在身体之外。
 - 标记期间疲劳按真实时间每秒消耗总量的一定百分比（默认 1%，满疲劳约 100 秒耗空），结束立刻恢复——中途力竭会自动收招，完全力竭时根本进不了模式。
 
 **绑定武器**
@@ -158,7 +158,7 @@ MIT — see [LICENSE](LICENSE).
 | 项 | 说明 | 默认 |
 |---|---|---|
 | 绑定的左轮手枪 | 选择哪把左轮能触发模式；其余三把不会被它响应 | 左轮手枪 |
-| 子弹追踪 | 处决射出的子弹会一路修正方向追着标记目标飞（需要 AdaptiveArsenal；原版弹道在出膛瞬间结算） | 开 |
+| 子弹追踪 | 处决射出的子弹会一路修正方向追着标记目标飞（需要 AdaptiveArsenal；原版弹道在出膛瞬间结算）。松鸡和兔子会被瞄准身体内部，标哪个部位都一样 | 开 |
 | 追踪强度 | 追踪力度：1 为标准；越低弹道越直（0.05 几乎不打弯），越高转得越急、越能咬住高速横移的目标 | 1 |
 | 进入 / 退出死神之眼 | 开启和结束模式的键；点输入框再按任意键或鼠标键可重绑 | 鼠标后侧键 |
 | 标记目标 | 把准星下的目标标记下来的键；重绑方式相同 | 鼠标中键 |

@@ -7,9 +7,9 @@ namespace DeadEye.Core;
 /// Steering for bullets that chase their mark after leaving the barrel (AdaptiveArsenal
 /// physics projectile only; the vanilla vp_Bullet resolves its hit inside Start()).
 /// Each keeps its OWN target, so an in-flight round never retargets on sequence advance.
-/// Aiming uses the target ROOT plus a height, not the mark's local body point: that
-/// point sweeps sideways when the animal turns, and the bullet then chases a jump — the
-/// visible hard turn. Corrections are split over frames, so the path reads as a curve.
+/// Aiming never uses the mark's local body point: it sweeps sideways when the animal
+/// turns and the bullet chases a jump. Both species use root + a mark-derived height, with
+/// per-species clamps; corrections split over frames so the path reads as a curve.
 /// </summary>
 internal static class HomingSteering
 {
@@ -22,25 +22,37 @@ internal static class HomingSteering
     {
         internal Rigidbody Body = null!;
         internal GameObject Target = null!;
+        internal Vector3 LocalOffset;
         internal float AimHeight;
+        internal bool SmallPrey;
         internal float ExpiresAt;
         internal bool Logged;
     }
 
     private static readonly List<Entry> _entries = new();
 
-    internal static void Register(Rigidbody body, GameObject target, Vector3 localOffset)
+    internal static void Register(Rigidbody body, GameObject target, Vector3 localOffset, bool smallPrey)
     {
         _entries.Add(new Entry
         {
             Body = body,
             Target = target,
-            // Height from the mark, but applied to the root in world space (see the summary).
-            AimHeight = Mathf.Clamp(localOffset.magnitude, 0.4f, 1.2f),
+            LocalOffset = localOffset,
+            AimHeight = AnimalBody.LargeAimHeight(localOffset),
+            SmallPrey = smallPrey,
             ExpiresAt = Time.unscaledTime + LifetimeSeconds,
         });
-        ModLog.Debug("homing projectile registered");
+        ModLog.Debug($"homing projectile registered ({(smallPrey ? "small prey: inside the body" : "large animal: root + height")})");
     }
+
+    /// <summary>
+    /// Same aim point the shot was fired at, so the round does not bend toward a second
+    /// opinion on the way: inside the body for prey, root + height for large animals.
+    /// </summary>
+    private static Vector3 AimPointOf(Entry entry)
+        => entry.SmallPrey
+            ? AnimalBody.PreyAimPoint(entry.Target.transform, entry.LocalOffset)
+            : entry.Target.transform.position + Vector3.up * entry.AimHeight;
 
     /// <summary>
     /// Called every Tick, in any state: bullets fired by the sequence are still in the air
@@ -71,8 +83,7 @@ internal static class HomingSteering
                 if (speed < MinSpeed)
                     continue; // still waiting for AdaptiveArsenal's launch force to land
 
-                Vector3 toTarget = entry.Target.transform.position + Vector3.up * entry.AimHeight
-                                   - entry.Body.transform.position;
+                Vector3 toTarget = AimPointOf(entry) - entry.Body.transform.position;
                 if (toTarget.sqrMagnitude < 0.0001f)
                     continue;
 

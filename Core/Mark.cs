@@ -14,6 +14,7 @@ internal sealed class Mark
 {
     private readonly BaseAi _ai;
     private readonly Vector3 _localOffset;
+    private readonly bool _smallPrey;
 
     internal Vector3 Velocity { get; private set; }
 
@@ -21,6 +22,7 @@ internal sealed class Mark
     {
         _ai = ai;
         _localOffset = ai.transform.InverseTransformPoint(worldPoint);
+        _smallPrey = AnimalBody.IsSmallPrey(ai);
         Velocity = Vector3.zero;
     }
 
@@ -28,6 +30,9 @@ internal sealed class Mark
 
     /// <summary>Body point offset in the animal's local space (used by the homing bullets).</summary>
     internal Vector3 LocalOffset => _localOffset;
+
+    /// <summary>Grouse / rabbit: any hit kills, so the shot is aimed at the animal's axis.</summary>
+    internal bool IsSmallPrey => _smallPrey;
 
     internal bool IsAlive => _ai != null && _ai.gameObject != null && _ai.GetAiMode() != AiMode.Dead;
 
@@ -39,6 +44,25 @@ internal sealed class Mark
             return false;
         }
         worldPoint = _ai.transform.TransformPoint(_localOffset);
+        return true;
+    }
+
+    /// <summary>
+    /// World point the shot should converge on. Small prey resolves INSIDE its body (see
+    /// <see cref="AnimalBody.PreyAimPoint"/>) because a body that thin cannot absorb an aim
+    /// point sitting on the surface; everything else uses the marked point itself.
+    /// </summary>
+    internal bool TryGetAimPoint(out Vector3 worldPoint)
+    {
+        if (!IsAlive)
+        {
+            worldPoint = default;
+            return false;
+        }
+
+        worldPoint = _smallPrey
+            ? AnimalBody.PreyAimPoint(_ai.transform, _localOffset)
+            : _ai.transform.TransformPoint(_localOffset);
         return true;
     }
 

@@ -90,6 +90,9 @@ internal static class DeadEyeManager
     /// <summary>Body point offset (animal local space) that goes with <see cref="PendingHomingTarget"/>.</summary>
     internal static Vector3 PendingHomingOffset;
 
+    /// <summary>Grouse / rabbit: the projectile converges on the body centre, not the mark.</summary>
+    internal static bool PendingHomingSmallPrey;
+
     /// <summary>Aim point for the camera driver while the firing sequence runs (null otherwise).</summary>
     internal static Vector3? CurrentAimPoint
     {
@@ -97,7 +100,7 @@ internal static class DeadEyeManager
         {
             if (State != DeadEyeState.Firing || _fireIndex >= _marks.Count)
                 return null;
-            return _marks[_fireIndex].TryGetWorldPoint(out var p) ? p : null;
+            return _marks[_fireIndex].TryGetAimPoint(out var p) ? p : null;
         }
     }
 
@@ -224,7 +227,7 @@ internal static class DeadEyeManager
         }
 
         var mark = _marks[_fireIndex];
-        if (!mark.TryGetWorldPoint(out Vector3 aimPoint))
+        if (!mark.TryGetAimPoint(out Vector3 aimPoint))
         {
             ModLog.Debug($"target {_fireIndex} is dead, skipping");
             AdvanceTarget("target dead");
@@ -369,6 +372,7 @@ internal static class DeadEyeManager
         // in flight instead of relying on the lead prediction being perfect.
         PendingHomingTarget = DeadEyeMod.Settings?.HomingBullets == true ? mark.Ai.gameObject : null;
         PendingHomingOffset = mark.LocalOffset;
+        PendingHomingSmallPrey = mark.IsSmallPrey;
         shooter.Fire();
         PendingHomingTarget = null; // consumed synchronously by the Fire prefix
         // The interval Fire() pushes onto the gate is the vanilla fire rate expressed in
@@ -381,7 +385,8 @@ internal static class DeadEyeManager
         float ts = Mathf.Max(0.001f, TimeScaler.Value);
         shooter.m_NextAllowedFireTime = Time.time + intervalReal * ts;
         _nextShotUnscaled = Time.unscaledTime + Mathf.Max(0.05f, intervalReal);
-        ModLog.Info($"shot {_fireIndex + 1}/{_marks.Count} fired (lead {mark.Velocity.magnitude:F1} m/s, intercept {(intercept - aimPoint).magnitude:F2} m off current pos, next in {intervalReal:F2}s real)");
+        ModLog.Info($"shot {_fireIndex + 1}/{_marks.Count} fired ({(mark.IsSmallPrey ? "small prey" : "large animal")}, " +
+                    $"lead {mark.Velocity.magnitude:F1} m/s, intercept {(intercept - aimPoint).magnitude:F2} m off current pos, next in {intervalReal:F2}s real)");
         AdvanceTarget("shot fired");
         return true;
     }
@@ -622,10 +627,18 @@ internal static class DeadEyeManager
             if (ai == null || ai.GetAiMode() == AiMode.Dead)
                 continue;
 
-            _marks.Add(new Mark(ai, hit.point));
+            var mark = new Mark(ai, hit.point);
+            _marks.Add(mark);
             Overlay.SetMessage($"已标记 {_marks.Count}/{MarkCap}", 1.2f);
             ModAudio.PlayMark();
-            ModLog.Debug($"marked {ai.gameObject.name} at {hit.point} ({_marks.Count}/{MarkCap})");
+            // Triage line: the AI type decides the aim model, and the distance between the
+            // shot point and the point the player actually aimed at says whether the model
+            // moved the round off the animal. (A prey body is ~0.2 m wide.)
+            mark.TryGetAimPoint(out Vector3 markAim);
+            ModLog.Debug($"marked {ai.gameObject.name} [{ai.GetType().Name}] " +
+                         $"{(mark.IsSmallPrey ? "small prey: body axis" : "large animal: marked point")} " +
+                         $"({_marks.Count}/{MarkCap}), aim {(markAim - hit.point).magnitude:F2} m from the crosshair, " +
+                         AnimalBody.DescribeBody(ai));
             return;
         }
 

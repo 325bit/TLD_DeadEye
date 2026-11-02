@@ -1,5 +1,17 @@
 # ChangeLog
 
+## 0.6.5
+
+- **Reworked the small-prey aim point again — the collider centre was worse than no special case at all.** A grouse or rabbit body is ~0.2 m wide, and the union of its colliders is much wider than the body, so the "centre" moved the aim point off the animal: the shot looked more misaligned than before, exactly as reported. The aim point is now **60 % of the way from the animal's root toward the marked surface**, i.e. inside the body — no collider bounds involved, so nothing can drag it outside.
+- The point is used identically for the camera, the lead intercept and the in-flight steering, so the round no longer starts at one point and bends toward a second opinion.
+- Mark log now prints the AI type, the distance between the shot point and the crosshair, and the body's collider bounds (`bodyBounds=... bodyCentreFromRoot=...`) — diagnostics only, no aiming uses them. On a grouse the bounds numbers show why the previous centre was unusable.
+
+## 0.6.4
+
+- **Grouse and rabbits now get their own aim point.** They were the losers of the 0.6.3 change: steering to the root plus a height used a 0.4 m floor, which sits above a ptarmigan's back, so a mark that looked dead-on still flew over it. Small prey is now detected (AI class `AiRabbit` / `AiPtarmigan`, then prefab name, then measured body height) and aimed at the **centre of its colliders** — the part you marked no longer matters, because a body that small dies to any hit.
+- The centre is used everywhere the shot is described: the lead intercept, the camera glide onto the mark, and the in-flight steering, so the round leaves the muzzle already aligned instead of turning after it.
+- The mark log now prints the AI type and which aim model was chosen (`small prey: body centre` / `large: root + height`), so a species that slips past detection is visible instead of showing up as a silent miss.
+
 ## 0.6.3
 
 - **The visible "hard turn" was largely a jumping aim point, not the turn rate.** The bullet aimed at the mark's local-space body point, which sweeps sideways whenever the animal turns on the spot — the bullet then chased that jump. It now aims at the target ROOT plus a height (taken from the mark), so the point only translates when the animal actually moves.
