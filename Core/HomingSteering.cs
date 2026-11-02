@@ -19,6 +19,8 @@ internal static class HomingSteering
     internal const float LifetimeSeconds = 8f;     // unscaled: a long shot under the slowdown can take seconds
     private const float MinSpeed = 1f;            // below this the launch force has not landed yet
     private const float AlignWindowSeconds = 0.1f; // real time after spawn in which the muzzle error may be cancelled outright
+    private const float ResidualDegrees = 0.5f;    // per frame: heading drift away from the commanded velocity
+    private const float ResidualMinSpeed = 30f;    // below this the round is dying and the frame timing dominates
     private const float SampleSpacing = 0.25f;    // tube-test interval: consecutive r=0.1 spheres overlap without gaps
     private const int MaxPathSamples = 48;        // cap on tube-test samples per swept segment (6 m/step covers it)
     private const int TraceLimit = 8;             // distances kept per round (first 7, then the latest)
@@ -41,6 +43,14 @@ internal static class HomingSteering
         internal float CreatedAt;
         internal float ExpiresAt;
         internal bool Aligned;
+
+        // Command-residual bookkeeping, see CheckCommandResidual.
+        internal Vector3 Commanded;
+        internal bool HasCommanded;
+        internal int ResidualFrames;
+        internal float ResidualMax;
+        internal float ResidualSeconds;
+        internal bool ResidualLogged;
 
         // Closest-approach bookkeeping, see TrackClosest / ReportClosest.
         internal Vector3 LastPos;
@@ -435,8 +445,49 @@ internal static class HomingSteering
                     $"miss ahead {Signed(Vector3.Dot(miss, forward))} right {Signed(Vector3.Dot(miss, right))} " +
                     $"up {Signed(miss.y)}, aspect {aspect:F0} deg, {entry.Samples} frames, {hitbox}, " +
                     $"v {entry.SpawnSpeed:F0} -> {entry.ClosestRoundSpeed:F0} m/s, {body}, " +
-                    $"target {velocity.magnitude:F1} m/s, " +
+                    $"target {velocity.magnitude:F1} m/s, " + ResidualText(entry) + ", " +
                     $"round {Vec(entry.ClosestRoundPos)} body {Vec(entry.ClosestBodyPoint)}, trace {TraceText(entry)}");
+    }
+
+    /// <summary>
+    /// Compares the velocity the game reports with the one this mod wrote last frame, plus the
+    /// gravity it must have picked up. Gravity is a KNOWN quantity, and it only turns a 299 m/s
+    /// round at ~1.9 deg/s — two orders below the threshold — so subtracting it lets the test
+    /// sit at half a degree per frame without ever flagging a falling round. What is left says
+    /// something OTHER than steering moved the round: a bounce, a teleport, or a jumping aim point.
+    /// </summary>
+    private static void CheckCommandResidual(Entry entry, Vector3 measured, float speed)
+    {
+        if (!entry.HasCommanded || speed < ResidualMinSpeed)
+            return;
+
+        float dt = Mathf.Max(Time.deltaTime, 0.0001f);
+        Vector3 expected = entry.Commanded;
+        try
+        {
+            if (entry.Body != null && entry.Body.useGravity)
+                expected += Physics.gravity * dt;
+        }
+        catch (System.Exception) { }
+
+        float residual = Vector3.Angle(measured, expected);
+        if (residual <= ResidualDegrees)
+            return;
+
+        entry.ResidualFrames++;
+        if (residual > entry.ResidualMax)
+        {
+            entry.ResidualMax = residual;
+            entry.ResidualSeconds = Time.unscaledTime - entry.FirstTrackAt;
+        }
+
+        if (entry.ResidualLogged)
+            return;
+
+        entry.ResidualLogged = true;
+        ModLog.Info($"homing steer residual: {residual:F2} deg in one frame ({residual / dt:F0} deg/s) at " +
+                    $"{entry.Samples} frames, {speed:F0} m/s — the round moved further than steering " +
+                    $"commanded (expected {Vec(expected)}, got {Vec(measured)})");
     }
 
     /// <summary>
@@ -457,6 +508,11 @@ internal static class HomingSteering
             return "round state unreadable";
         }
     }
+
+    private static string ResidualText(Entry entry)
+        => entry.ResidualFrames > 0
+            ? $"steer residual {entry.ResidualMax:F2} deg in {entry.ResidualFrames} frame(s)"
+            : "steer residual none";
 
     private static string Signed(float value) => value >= 0f ? $"+{value:F2}" : $"{value:F2}";
 
@@ -691,6 +747,8 @@ internal static class HomingSteering
                 if (speed < MinSpeed)
                     continue; // still waiting for AdaptiveArsenal's launch force to land
 
+                CheckCommandResidual(entry, velocity, speed);
+
                 Vector3 bodyPos = entry.Body.transform.position;
                 Vector3 bodyPoint = BodyPointOf(entry);
                 Vector3 targetVelocity = VelocityOf(entry, entry.Target.transform.position);
@@ -729,6 +787,8 @@ internal static class HomingSteering
                     {
                         float muzzleError = Vector3.Angle(dir, aim);
                         entry.Body.velocity = aim * speed;
+                        entry.Commanded = aim * speed;
+                        entry.HasCommanded = true;
                         entry.Body.transform.rotation = Quaternion.LookRotation(aim);
                         ModLog.Info($"homing aligned: muzzle error {muzzleError:F2}deg cancelled at " +
                                     $"{speed:F0} m/s ({(entry.SmallPrey ? "small prey" : "large animal")})");
@@ -746,6 +806,8 @@ internal static class HomingSteering
 
                 Vector3 steered = Vector3.RotateTowards(dir, aim, step, 0f);
                 entry.Body.velocity = steered * speed;
+                entry.Commanded = steered * speed;
+                entry.HasCommanded = true;
                 if (steered.sqrMagnitude > 0.0001f)
                     entry.Body.transform.rotation = Quaternion.LookRotation(steered);
             }

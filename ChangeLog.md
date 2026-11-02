@@ -1,5 +1,13 @@
 # ChangeLog
 
+## 0.7.10
+
+- **New detector: a round that turns further than the steering commanded.** Each frame the velocity the game reports is compared with the vector this mod wrote one frame earlier, plus the gravity it must have picked up in between. Gravity is a known quantity and only turns a 299 m/s round at ~1.9 deg/s, so subtracting it lets the test sit at **0.5 deg per frame** — 15x above what gravity can do in a 17 ms frame, and 10-40x below a real steering correction — without ever flagging a falling round. Anything left over means something OTHER than steering moved the round: a bounce, a teleport, or a jumping aim point.
+- The pass report gains a field: `steer residual 1.24 deg in 3 frame(s)` or `steer residual none`, and the first offending frame per round logs a line at Info (not behind Verbose — a diagnostic nobody can see is what made the marking regression invisible):
+  `homing steer residual: 1.24 deg in one frame (73 deg/s) at 41 frames, 297 m/s — the round moved further than steering commanded (expected ..., got ...)`
+- This is the first of the four sharp-turn detectors discussed; the other three (per-frame heading delta, gravity-subtracted path/chord ratio, curvature radius) are not implemented yet.
+- Session results this was designed from (0.7.9, 17 shots): 15 hits (88 %), 14 of 16 passes within 0.42 m, one hit at **120.4 m** with a 0.16 m closest pass; marking worked (11 resolved on the body — 5 body-capsule centres, 6 head surfaces — plus 6 Ptarmigan marks that fell back to the raw hit point because no damageable collider existed on them at mark time).
+
 ## 0.7.9
 
 - **Marking works again: 0.7.8 could not mark a single animal.** That build resolved the mark only on a "damageable, enabled, non-trigger" collider and dropped the click otherwise, so when the ray's hit resolved to the oversized proxy and the real capsules were not reachable that way, every candidate was silently skipped and the only thing the player saw was `准星处没有活物`. Measured session: 11 mode entries, 11 `exiting (no marks)`, 0 marks. The resolution failure is now **logged as a warning** and the mark **degrades to the raw hit point** (the pre-0.7.8 behaviour) instead of dropping the click — a marking defect can no longer lock the mode out.
