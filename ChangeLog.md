@@ -1,5 +1,67 @@
 # ChangeLog
 
+## 0.5.4
+
+- **Fixed the camera teleports and the dead bullet time — two separate root causes, both confirmed by disassembly / live logs.**
+- Camera: the look-at slot semantics documented in 0.4.6 were inverted on BOTH halves. Re-disassembling `PlayerManager.LookAtTargetForTime.Update` shows the factor is `1 - (TimeRemaining - BlendIn) / (FrameTime - BlendIn)` and the update calls `Slerp(m_RestoreCameraOrientation, m_CameraTargetOrientation, t)`, so **t runs 0 -> 1 with `m_RestoreCameraOrientation` as the START and `m_CameraTargetOrientation` as the END** — the field names were right all along. Every release since 0.4.6 used the swapped slots, which made the first Update of every glide segment apply the ENDPOINT: the view snapped onto the target and then slid back. Requests are now written with the current rotation in the Restore slot and the target in the CameraTarget slot, and the opening swing uses EaseOut (a fast whip that decelerates) instead of EaseIn.
+- Time scale: TimeAccelerator patches `InterfaceManager.Update` with a PREFIX that assigns `Time.timeScale = 1` on every frame while its key is not held, so the slowdown was stamped back to normal between ticks (live log: `fire sequence started ... timeScale 0.05`, then `ts=1.00 gts=1.00` half a second later). `TimeScaler` now owns the value (`Value`, never read back from the engine), advances the lerp on unscaled time, and re-asserts it from a **postfix on `InterfaceManager.Update`** — guaranteed to run after any prefix writer on that method. Everything that needs the scale (`RealToScaled`, the Animator compensation, the exit test) uses the owned value.
+- Swing pacing: the fixed 150 deg/s sweep plus "the shot waits for the camera" is gone. Each camera phase now derives its OWN angular speed from the fire rhythm: segment duration = real seconds left until the weapon may fire again, floored by a 400 deg/s ceiling. Phase 1 (before the velocity pair is frozen) heads for the mark body; phase 2 (after) heads for the predicted intercept — different remaining angles, same time budget, so a big inter-target angle swings fast instead of snapping, and **the vanilla fire rate is preserved** because the camera is no longer a firing gate.
+- Segments already within 0.5 deg of their target are no longer re-issued (0.5.3 issued 0.05 s stubs in a loop while the animation gate was closed, which read as a stutter).
+
+## 0.5.3
+
+- Fixed the between-shot camera whip (test video 6 + live log): the marks were spread up to 131 deg apart, and the time-to-go law compressed each inter-target swing into the 0.5 s fire interval — a 300 deg/s whip after EVERY shot (log: "pursuit glide issued (duration 0.44s real, drift 131.3 deg)"), which read as a teleport. The tracking law is now a CONSTANT swing speed (150 deg/s, clamped 0.05-2 s): the camera sweeps the remaining angle at one comfortable rate, and the SHOT WAITS FOR ARRIVAL (fires once the view is within 8 deg of its target point, on top of the vanilla weapon-rate pacing). Smoothness beats raw fire rate; hits never depended on the camera anyway.
+- Fixed the execution/marking slow-mo silently dead (both sessions ran at ts=1.00 gts=1.00): the MelonCoroutines-based lerp stopped resuming in the field, so the scale never moved while every guard believed it was active. TimeScaler is now driven entirely from the Tick (MoveTowards lerp + per-frame re-assertion of both clocks, no coroutines).
+
+## 0.5.2
+
+- Reworked the lead prediction into a uniform-linear two-sample design (spike fix round 2): velocity is NO LONGER re-estimated every Tick. When a mark becomes the active target, the mod takes exactly TWO samples of the AI ROOT position 0.25 s apart (real time, started immediately so the window overlaps the swing), freezes the vector, and treats the animal as uniform linear motion from then on. Root position instead of the marked body offset, so an in-place body rotation cannot fake a lateral velocity.
+- Camera retarget phases per mark: BEFORE the velocity pair is frozen the crosshair swings onto the mark itself; AFTER it is frozen the crosshair tracks the predicted intercept (frozen velocity + live position + fresh flight time, so it still moves smoothly). The switch happens exactly once per mark — the camera never chases a per-Tick re-estimated direction, which is what produced the teleport-like spikes.
+- Shots wait for the frozen velocity (`_interceptReady`); the 0.25 s window always completes during the approach, so the pacing is unaffected.
+
+## 0.5.1
+
+- Fixed "the player is still slowed and the second shot never fires" (0.5.0 live log): at sequence start `Time.timeScale` had been restored to 1.00 by an external writer (the game or another mod) while our `GameManager.m_GlobalTimeScale` stayed at the marking value — the mismatch alone slowed the player's fire path (the player reads the global scale), so shots 2/3 timed out after 4 s each while shot pacing was already open. Both `Marking` and `Firing` now re-assert the owned scale EVERY frame (`TimeScaler.EnsureScale`), defeating any external stomp.
+- New setting 处决时间流速 (ExecutionTimeScale, default 0.8): the firing phase owns a SEPARATE, milder time scale — entering the execution lerps from the marking value to it, the yellow tint persists, and the sequence end restores to 1. With both clocks equal the Animator compensation (`1/timeScale`) is correct regardless of which scale the player's rig consumes.
+- Added a throttled `shot gated: ...` diagnostic that dumps every fire-gate value (reload cooldown, reloading, allowed-to-fire, scaled gate, both time scales, animator speed) whenever our pacing is open but the game refuses to fire — a repeat of this failure is now triageable from one log line.
+
+## 0.5.0
+
+- Reworked the toggle's end logic. With NO marks: pressing the toggle exits the mode immediately (unchanged). With marks: pressing the toggle now ends the marking phase and dives STRAIGHT into the firing phase — the yellow filter and the slowdown are no longer removed for the exit lerp; they persist until the whole sequence ends, then restore together.
+- The slowdown now only affects the WORLD during firing; the player acts at real speed: the first-person `PlayerAnimation.m_Animator` is driven at `speed = 1/timeScale` (Unity's Animator.speed multiplies the scaled deltaTime, so this restores real-time animation exactly), and the fire pacing moved to UNSCALED time — the interval `Fire()` pushes onto `m_NextAllowedFireTime` is the vanilla real rate (vanilla always runs at scale 1), so it is used as-is, while the scaled gate itself is neutralized before each shot. The look-at glides now take REAL durations (struct fields get `duration x timeScale`), keeping the time-to-go pacing coherent under the slowdown.
+- State flow simplified: `Marking --toggle+marks--> Firing --> Exiting (restore tail) --> Inactive`; `Exiting` is now the shared restore tail of both the no-marks exit and the end of a firing sequence.
+- README fatigue default corrected (the 0.4.3 change to 1 %/s had not reached the bilingual usage text).
+
+## 0.4.8
+
+- Fixed the post-shot swing-away (test video 5: right after each shot the camera swung 40-70 degrees AWAY from the next target, then swung back and arrived just as the next shot fired — read as teleport / pull-back / re-swing).
+- Root cause: the pursuit glide's endpoint was the LEAD INTERCEPT (`ComputeIntercept`), not the target. The intercept moves with the per-Tick velocity sample, and one teleport-sized sample (AI repositioning / root-rotation burst sweeping the marked body offset; the clamp allowed up to 400 m/s) flung the intercept dozens of meters off — live logs show the first pursuit glide of a sequence needing `duration 0.67s`, i.e. a remaining angle of ~161 degrees while the crosshair sat ON the target, and drift re-issues growing 14 -> 54 -> 116 -> 143 degrees within a single sequence. The camera was chasing a phantom.
+- Fix: the camera now aims at the TARGET BODY point only; the lead intercept is exclusively the projectile redirect's business (hits never depended on the camera). The velocity clamp tightened from 400 to 30 m/s so one bad sample can no longer fling the shot's own intercept either. The re-issue pre-advance is additionally capped at 25% of the glide so a short duration can never pre-jump visibly.
+
+## 0.4.7
+
+- Killed the residual between-shot stutter (test video 4: one fully frozen frame roughly every 0.06–0.12 s during the firing swing, plus short slam-then-crawl bursts right after each shot).
+- Live-log evidence: each shot triggered THREE pursuit re-issues — two with `duration 0.05s` (the fire gate is still near zero right after a shot, so time-to-go clamped to the floor) and then the main segment. Each re-issue burns one dead frame (the first game Update applies t=1 = the start slot = the current view, so nothing moves that frame).
+- Two fixes in the pursuit glide: (1) the start slot is PRE-ADVANCED by one frame of motion (`Slerp(current, mark, dt/duration)`), so the first application after a re-issue lands exactly where the next frame should be — re-issues no longer cost a dead frame; (2) the duration is never below remaining-angle / 240 deg/s, so a near-zero fire gate can no longer slam the remaining angle into 0.05 s (burst-then-stall) — the view instead creeps onto the mark at a capped constant speed. Arriving late is safe: hits never depend on the camera (projectiles are redirected onto the committed intercept).
+
+## 0.4.6
+
+- Fixed the between-shot camera stutter (test video 3: alternating move/freeze frames at ~30 Hz, instant snaps, and swings that sped up and died instead of holding a rate).
+- Root cause found by disassembling `PlayerManager.LookAtTargetForTime.Update` + `TweenValue`: the tween factor runs 1 -> 0 and the ease phase lasts exactly `FrameTime - BlendIn`. Every request so far used `FrameTime == BlendIn`, which empties that phase — each request degenerated into an instant pin on its endpoint. The per-Tick re-issue from 0.4.5 therefore pinned the camera onto the recomputed endpoint every single frame (filtered through the game's camera smoothing = the stutter), and the first 0.55 s "ease" glide was always an instant snap.
+- The look-at requests now set `BlendInTime = 0` so the tween actually runs, with the two quaternion slots deliberately swapped (mark -> `m_RestoreCameraOrientation`, current rotation -> `m_CameraTargetOrientation`) to match the 1 -> 0 direction; expiry parks the view on the mark.
+- The first swing is a true 0.55 s EaseIn glide (fast start, decelerates onto target 1 — the "quick whip" stays).
+- The pursuit glide is now issued per segment instead of per Tick: a re-issue happens only when the active glide expires or the mark drifts more than 5 deg off its captured endpoint (at most every 0.12 s, since a re-issue costs one idle frame). Duration stays time-to-go paced, so the view holds a constant rate and arrives at each mark exactly when its shot is due.
+
+## 0.4.5
+
+- Fixed the remaining camera jolt during the firing sequence. The 0.4.4 pursuit used a fixed 0.12 s glide, so the view burst onto each mark within a few frames and then sat still for the rest of the fire interval — still stop-and-go, just faster.
+- The tracking glide is now time-to-go paced: every tick re-issues a LINEAR glide whose duration equals the time left until the weapon may fire again (clamped 0.05–0.6 s). A per-frame restart advances dt/duration of the remaining angle, so the swing speed self-regulates to a constant and the view arrives at each mark exactly when its shot is due — one continuous swing paced to the fire rate.
+
+## 0.4.4
+
+- Smoothed the camera swing during the firing sequence. Before, the view played a full 0.55 s ease glide, sat still until the shot, then snapped toward the next mark — the velocity profile read as stop-and-go with hard jumps at every shot.
+- Now only the FIRST swing is the one-shot 0.55 s ease glide; every later camera motion is a per-frame chained LINEAR pursuit glide (0.12 s) re-issued from the camera's current orientation toward the recomputed intercept. Linear has full speed at the tween start, so per-frame re-issuing never stalls (ease-in per-frame restarts are what froze the view back in 0.1.0) — the swing reads as one continuous "gun-swing" motion that gently slows onto each target.
+
 ## 0.4.3
 
 - Renamed the four revolver choices in the mod settings to the official in-game Chinese item names: 左轮手枪 / 猎人的左轮手枪 / 护林人的左轮手枪 / 典狱长的左轮手枪 (order unchanged, saved selections stay valid).

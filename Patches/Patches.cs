@@ -4,6 +4,30 @@ using UnityEngine;
 namespace DeadEye.Patches;
 
 /// <summary>
+/// Re-asserts the owned bullet-time scale after every InterfaceManager.Update. Other mods
+/// write Time.timeScale from a PREFIX on this very method (TimeAccelerator sets
+/// `Time.timeScale = 1` on every frame while its key is not held), which stamped our
+/// slowdown back to normal between ticks — the "time stop stopped working" report. A
+/// postfix here is guaranteed to run after any prefix writer on the same method, and it is
+/// a cheap no-op while we own nothing.
+/// </summary>
+[HarmonyPatch(typeof(InterfaceManager), "Update")]
+internal static class TimeScaleGuardPatch
+{
+    private static void Postfix()
+    {
+        try
+        {
+            DeadEye.Core.TimeScaler.Reassert();
+        }
+        catch (System.Exception ex)
+        {
+            ModLog.Error($"time scale guard failed: {ex}");
+        }
+    }
+}
+
+/// <summary>
 /// Vanilla path (AdaptiveArsenal absent): the hit is resolved inside vp_Bullet.Start().
 /// The prefix redirects the freshly spawned bullet onto the committed aim point
 /// (LastShotAimPoint, TTL 0.5 s) and zeroes its residual Accuracy spread. See §3.

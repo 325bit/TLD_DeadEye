@@ -11,9 +11,9 @@ namespace DeadEye;
 /// Dead Eye: an RDR2-style bullet-time marking mode for The Long Dark.
 /// Toggle (default mouse side button) while carrying the bound revolver -> time slows, the
 /// screen tints yellow, fatigue drains a configurable percent per second, and every
-/// middle-click raycasts a mark onto an animal (cap = revolver clip size). Toggle again ->
-/// time restores, the revolver auto-draws and each mark is chain-fired via the vanilla
-/// firing pipeline (vanilla damage, bleed, skill XP and audio all preserved).
+/// middle-click raycasts a mark onto an animal (cap = revolver clip size). Toggle again:
+/// with marks, the marking phase ends and the filter + slowdown carry straight through the
+/// firing sequence while the player is compensated back to real time; without marks, exit.
 /// </summary>
 public class DeadEyeMod : MelonMod
 {
