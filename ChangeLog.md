@@ -1,5 +1,21 @@
 # ChangeLog
 
+## 0.7.9
+
+- **Marking works again: 0.7.8 could not mark a single animal.** That build resolved the mark only on a "damageable, enabled, non-trigger" collider and dropped the click otherwise, so when the ray's hit resolved to the oversized proxy and the real capsules were not reachable that way, every candidate was silently skipped and the only thing the player saw was `准星处没有活物`. Measured session: 11 mode entries, 11 `exiting (no marks)`, 0 marks. The resolution failure is now **logged as a warning** and the mark **degrades to the raw hit point** (the pre-0.7.8 behaviour) instead of dropping the click — a marking defect can no longer lock the mode out.
+- **The collider set is taken from the hit collider's transform ROOT** (only when that root holds exactly one animal, so a shared holder cannot mix a flock), falling back to the `BaseAi` object. A prefab that hangs its damage capsules outside the object carrying `BaseAi` was the most likely reason the new resolution found nothing.
+- **The crosshair gate is body-scaled, not a bare metre.** The fixed 0.15 m equals **0.095 degrees at 88 m**, so it would have refused nearly every long shot on a target the player can see perfectly — the tolerance is now `max(0.30 m, 0.4 x the body's largest dimension)`, and the refusal message prints both numbers.
+- The three failure messages are now distinct: the ray hit nothing (`准星处没有活物（射线没碰到动物）`), the crosshair is off the damageable body (distance + tolerance), and the resolution fell back to the raw hit point (log warning, mark still created).
+
+## 0.7.8
+
+- **A mark is now taken on the animal's damageable body, not wherever the physics ray happened to hit.** An animal's collision geometry is a species-sized capsule several times taller than the model — measured `bodyBounds` 1.00 x 1.50 x 1.00 for a grouse and 1.50 x 2.26 x 1.50 for a rabbit, against a 0.25-0.30 m body — so the raw hit point could sit a body-length above the bird. A screenshot showed the red X hanging roughly 0.35 m over a ptarmigan, and because the small-prey aim point is derived from that mark, the whole shot inherited the error. The mark is now resolved against the colliders that can take damage (`LocalizedDamage` on layer 16/27), so it lands on the body however big the invisible proxy is.
+- **Grouse and rabbits mark the CENTRE of their body capsule.** Inside a 0.3 m animal there are no parts worth distinguishing, and the centre is what the depth slider was always approximating. The slider keeps its meaning but its upper reference is now that centre: 1.0 aims dead centre, lower values pull the round toward the feet. The mark log prints `aim N m off it`, which is the number to tune against.
+- **A mark is refused when the crosshair is not actually on the body** — if the ray misses every damageable collider by more than 0.15 m, the click does nothing but show `准星不在活物的可伤害部位上（偏 N m）`. The oversized capsule used to accept a mark from anywhere inside it, including empty air beside or above the animal.
+- Large animals keep the marked surface point (a head mark still hits the head), but now taken from a damageable collider, so the height clamp and the intercept work off a point that is really on the animal.
+- Mark log format changed to report the resolution source and the real geometry:
+  `marked WILDLIFE_Ptarmigan_2 [AiPtarmigan] small prey: capsule_body centre, 0.42 m from root, crosshair miss 0.00 m, aim 0.11 m off it (fraction 0.60), bodyBounds=...`
+
 ## 0.7.7
 
 - **A round killed by a physical contact now reports where it actually died.** The pass report reads its last recorded sample, but the physics step that ends a flight is also the step that destroys the round — so the segment that reached the animal was never sampled, and every contact hit reported the distance it had one whole step earlier. In the last session that meant `closest 8.44-17.51 m` and `hitbox never crossed` on all 7 contact hits, while the same rounds logged `contact resolved on capsule_body ... 31.0 m from the muzzle, damage 598 applied`: the numbers contradicted each other and made a real hit indistinguishable from a 15 m miss.

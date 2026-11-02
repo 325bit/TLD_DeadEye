@@ -28,7 +28,7 @@ internal class Settings : JsonModSettings
     public float HomingStrength = 1f;
 
     [Name("小体型瞄准点")]
-    [Description("松鸡、兔子这类小目标朝哪里打：0 = 动物根部（脚下），1 = 你瞄到的那一点（体表），中间值 = 身体内部。默认 0.6，即从根部朝你瞄的位置收进 60%，落在体内。调整后立刻生效，不用重新标记。")]
+    [Description("松鸡、兔子这类小目标朝哪里打：0 = 动物根部（脚下），1 = 它身体胶囊的中心，中间值 = 两者之间。默认 0.6。标记已经落在身体中心上了，所以 1.0 = 正中心，调小则更贴脚下（用来抵消飞行中的下坠感）。调整后立刻生效，不用重新标记。")]
     [Slider(0f, 1f)]
     public float PreyAimFraction = 0.6f;
 

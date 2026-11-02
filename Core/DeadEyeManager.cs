@@ -734,7 +734,7 @@ internal static class DeadEyeManager
             return;
 
         var ray = camera.ScreenPointToRay(new Vector3(Screen.width / 2f, Screen.height / 2f, 0f));
-        var rawHits = Physics.RaycastAll(ray, 150f);
+        var rawHits = Physics.RaycastAll(ray, AnimalBody.MarkRange);
         // Copy into a managed array so System.Array.Sort(comparison) is usable.
         var hits = new RaycastHit[rawHits.Length];
         for (int i = 0; i < rawHits.Length; i++)
@@ -752,7 +752,30 @@ internal static class DeadEyeManager
             if (ai == null || ai.GetAiMode() == AiMode.Dead)
                 continue;
 
-            var mark = new Mark(ai, hit.point);
+            // Restrict the mark to the animal's DAMAGEABLE colliders. The raw hit point can be
+            // anywhere on a collision capsule five to seven times taller than the animal, and
+            // an aim point derived from it sits above the body — the whole shot then misses.
+            // A resolution failure must never lock marking out, so it degrades to the raw hit
+            // point (the old behaviour) with a warning instead of dropping the click.
+            if (!AnimalBody.TryResolveMarkPoint(ai, hit.collider, ray, out Vector3 markPoint,
+                                                out float miss, out float tolerance, out string source))
+            {
+                ModLog.Warn($"mark: nothing damageable resolved on {hit.collider.gameObject.name} " +
+                            $"({HomingSteering.DescribeHitbox(hit.collider)}) — using the raw hit point");
+                markPoint = hit.point;
+                miss = 0f;
+                tolerance = 0f;
+                source = $"raw hit on {hit.collider.gameObject.name}";
+            }
+            // …and the crosshair has to be ON that body, not merely inside the oversized
+            // capsule: refusing here is what stops a mark being planted in empty air.
+            else if (miss > tolerance)
+            {
+                Overlay.SetMessage($"准星偏离活物的可伤害部位（偏 {miss:F2} m，容差 {tolerance:F2} m）", 1.5f);
+                return;
+            }
+
+            var mark = new Mark(ai, markPoint);
             _marks.Add(mark);
             Overlay.SetMessage($"已标记 {_marks.Count}/{MarkCap}", 1.2f);
             ModAudio.PlayMark();
@@ -762,13 +785,14 @@ internal static class DeadEyeManager
             // the animal. (A prey body is ~0.2 m wide.)
             mark.TryGetAimPoint(out Vector3 markAim);
             ModLog.Debug($"marked {ai.gameObject.name} [{AnimalBody.SpeciesName(ai)}] " +
-                         $"{(mark.IsSmallPrey ? $"small prey: {AnimalBody.PreyAimFraction:F2} from root" : "large animal: marked point")} " +
-                         $"({_marks.Count}/{MarkCap}), aim {(markAim - hit.point).magnitude:F2} m from the crosshair, " +
-                         AnimalBody.DescribeBody(ai));
+                         $"{(mark.IsSmallPrey ? "small prey" : "large animal")}: {source}, " +
+                         $"{(markPoint - ai.transform.position).magnitude:F2} m from root, " +
+                         $"crosshair miss {miss:F2} m, aim {(markAim - markPoint).magnitude:F2} m off it " +
+                         $"(fraction {AnimalBody.PreyAimFraction:F2}), " + AnimalBody.DescribeBody(ai));
             return;
         }
 
-        Overlay.SetMessage("准星处没有活物", 1.2f);
+        Overlay.SetMessage("准星处没有活物（射线没碰到动物）", 1.2f);
     }
 
     // ---------------------------------------------------------------- Helpers
