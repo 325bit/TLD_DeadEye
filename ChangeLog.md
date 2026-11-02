@@ -1,5 +1,10 @@
 # ChangeLog
 
+## 0.6.2
+
+- Back to PURE pursuit (aim at the animal's current body point) so the 追踪强度 setting alone decides hit rate versus look — no lead term confounding the comparison. The strength setting is kept and now scales the turn ceiling around a 400 deg/s base (0.5 -> 200 deg/s, 2.5 -> 1000 deg/s).
+- Kept from 0.6.1: the 8 s bullet lifetime (a long shot under the execution slowdown no longer stops steering mid-flight) and the overall turn ceiling raise from the original 220 deg/s.
+
 ## 0.6.1
 
 - Stronger, smarter tracking. The bullet used to aim straight at the animal's CURRENT body point, which makes a 300 m/s projectile overshoot and spiral on fast crossing targets — the remaining misses. It now uses LEAD pursuit: the mark's sampled velocity (per scaled second, smoothed, teleport-clamped) times the remaining flight time, so the round flies almost straight at where the animal will be and spends its turn budget on real corrections. Turn ceiling raised 220 -> 520 deg/s.

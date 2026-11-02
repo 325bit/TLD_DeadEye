@@ -7,18 +7,15 @@ namespace DeadEye.Core;
 /// Steering for bullets that chase their mark after leaving the barrel. Only the
 /// AdaptiveArsenal projectile is a real physics body (Rigidbody + AddForce); the vanilla
 /// vp_Bullet resolves its hit inside Start() and cannot be steered. Each entry keeps its
-/// OWN target, so an in-flight round never retargets when the sequence advances. Aiming
-/// is LEAD pursuit (where the animal will be), because pure pursuit makes a fast bullet
-/// overshoot and spiral on crossing targets.
+/// OWN target, so an in-flight round never retargets when the sequence advances.
+/// PURE pursuit on purpose (aim at the animal's current body point): the strength setting
+/// is the one knob being tuned for hit rate versus look, so the control law stays simple.
 /// </summary>
 internal static class HomingSteering
 {
-    private const float BaseTurnDegPerSec = 520f; // before the strength setting; pure pursuit spiralled at 220
+    private const float BaseTurnDegPerSec = 400f; // x the strength setting (0.5-2.5 -> 200-1000 deg/s)
     private const float LifetimeSeconds = 8f;     // unscaled: a long shot under the slowdown can take seconds
     private const float MinSpeed = 1f;            // below this the launch force has not landed yet
-    private const float LeadFactor = 0.9f;        // 1 = full lead (bullet flies straight), <1 leaves room to correct
-    private const float SampleInterval = 0.05f;   // SCALED seconds between target-velocity samples
-    private const float MaxTargetSpeed = 40f;     // per scaled second; rejects teleports and scene moves
 
     private sealed class Entry
     {
@@ -26,11 +23,6 @@ internal static class HomingSteering
         internal GameObject Target = null!;
         internal Vector3 LocalOffset;
         internal float ExpiresAt;
-
-        internal Vector3 LastPoint;
-        internal float LastSampleTime;   // scaled
-        internal Vector3 VelocityScaled; // metres per SCALED second
-        internal bool Sampled;
     }
 
     private static readonly List<Entry> _entries = new();
@@ -58,7 +50,6 @@ internal static class HomingSteering
             return;
 
         float turnRate = BaseTurnDegPerSec * Mathf.Clamp(strength, 0.2f, 3f) * Mathf.Deg2Rad;
-        float nowScaled = Time.time;
         float nowReal = Time.unscaledTime;
 
         for (int i = _entries.Count - 1; i >= 0; i--)
@@ -77,25 +68,14 @@ internal static class HomingSteering
                 if (speed < MinSpeed)
                     continue; // still waiting for AdaptiveArsenal's launch force to land
 
-                Vector3 point = entry.Target.transform.TransformPoint(entry.LocalOffset);
-                SampleTargetVelocity(entry, point, nowScaled);
-
-                Vector3 toPoint = point - entry.Body.transform.position;
-                if (toPoint.sqrMagnitude < 0.0001f)
+                Vector3 toTarget = entry.Target.transform.TransformPoint(entry.LocalOffset)
+                                   - entry.Body.transform.position;
+                if (toTarget.sqrMagnitude < 0.0001f)
                     continue;
-
-                // Lead pursuit: aim where the animal will be when the bullet gets there.
-                // VelocityScaled is already in metres per scaled second, so the remaining
-                // flight time (distance / speed, also scaled) multiplies it directly.
-                float flightTime = toPoint.magnitude / speed;
-                Vector3 aim = point + entry.VelocityScaled * (flightTime * LeadFactor);
-                Vector3 toAim = aim - entry.Body.transform.position;
-                if (toAim.sqrMagnitude < 0.0001f)
-                    toAim = toPoint;
 
                 Vector3 steered = Vector3.RotateTowards(
                     velocity / speed,
-                    toAim.normalized,
+                    toTarget.normalized,
                     turnRate * Time.deltaTime,
                     0f);
 
@@ -109,37 +89,6 @@ internal static class HomingSteering
                 _entries.RemoveAt(i);
             }
         }
-    }
-
-    /// <summary>
-    /// Samples the target's velocity in SCALED world units (metres per scaled second), so it
-    /// can be multiplied by a scaled flight time directly. Smoothed, and clamped so a single
-    /// teleport-sized sample cannot fling the aim point.
-    /// </summary>
-    private static void SampleTargetVelocity(Entry entry, Vector3 point, float nowScaled)
-    {
-        if (!entry.Sampled)
-        {
-            entry.LastPoint = point;
-            entry.LastSampleTime = nowScaled;
-            entry.Sampled = true;
-            return;
-        }
-
-        float dt = nowScaled - entry.LastSampleTime;
-        if (dt < SampleInterval)
-            return;
-
-        Vector3 measured = (point - entry.LastPoint) / dt;
-        entry.LastPoint = point;
-        entry.LastSampleTime = nowScaled;
-
-        if (measured.sqrMagnitude > MaxTargetSpeed * MaxTargetSpeed)
-            return; // teleport / scene change — keep the previous estimate
-
-        entry.VelocityScaled = entry.VelocityScaled.sqrMagnitude < 0.0001f
-            ? measured
-            : Vector3.Lerp(entry.VelocityScaled, measured, 0.5f);
     }
 
     internal static void Clear() => _entries.Clear();
