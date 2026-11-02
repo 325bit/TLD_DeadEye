@@ -28,11 +28,6 @@ internal class Settings : JsonModSettings
 
     [Section("子弹时间")]
 
-    [Name("时间流速")]
-    [Description("进入标记模式后世界的时间流速。0.1 = 十分之一速，越小越慢。")]
-    [Slider(0.05f, 0.5f)]
-    public float TargetTimeScale = 0.1f;
-
     [Name("处决时间流速")]
     [Description("按切换键进入处决环节后的时间流速，独立于标记阶段的流速。默认 0.8：世界轻微放慢（黄滤镜延续），人物开火保持正常速率。1 = 不放慢。")]
     [Slider(0.1f, 1f)]

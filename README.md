@@ -2,7 +2,7 @@
 
 [English](#english) · [中文](#中文)
 
-![version](https://img.shields.io/badge/version-0.5.4-informational)
+![version](https://img.shields.io/badge/version-0.5.8-informational)
 
 ![game](https://img.shields.io/badge/The%20Long%20Dark-2.55-success)
 
@@ -20,7 +20,7 @@ A The Long Dark mod that slows the world down, lets you mark animals like RDR2's
 
 **Bullet time**
 
-- Press the side mouse button while carrying a revolver — time slows to a tenth speed, the screen tints yellow and the signature activation sound plays, like Dead Eye in Red Dead Redemption 2.
+- Press the side mouse button while carrying a revolver — the revolver is drawn if it was stowed (the raise plays out in slow motion), time slows to a tenth speed for 0.7 s (the draw reveal), the screen tints yellow and the signature activation sound plays, like Dead Eye in Red Dead Redemption 2. When the reveal ends the world drops to the fixed deeper marking speed (0.01x), so the rest of the raise crawls through the whole marking phase.
 - Press the middle mouse button while looking at a live animal — a red mark appears over it and stays attached to the animal even while it moves, with a short sound confirming the mark.
 - You can mark the same animal several times or several animals in any order — the number of marks never exceeds the rounds left in the revolver's cylinder.
 
@@ -50,7 +50,7 @@ A The Long Dark mod that slows the world down, lets you mark animals like RDR2's
 ### Usage
 
 1. Carry the revolver selected in the settings (it can stay in your pack).
-2. Press the side mouse button — time slows, the screen turns yellow, and "死神之眼 · 标记目标" appears.
+2. Press the side mouse button — time slows, the revolver is drawn if it was stowed, the screen turns yellow, and "死神之眼 · 标记目标" appears. The draw speed (0.1x) only lasts the first 0.7 s; the world then drops to the fixed marking speed (0.01x) so the rest of the raise crawls through the whole marking phase.
 3. Aim at an animal and press the middle mouse button — a red mark appears; repeat up to the mark cap.
 4. Press the side mouse button again — the marking phase ends and every mark is shot in order. The yellow tint and the slowdown carry through the whole execution, while your own actions (draw, fire rate) run at normal speed. If nothing was marked, the same press ends the mode immediately.
 
@@ -63,8 +63,7 @@ Settings live under **Options → Mod Settings → Dead Eye (死神之眼)**.
 | 绑定的左轮手枪 | Picks which revolver triggers the mode; the other three are ignored by it | 左轮手枪 |
 | 进入 / 退出死神之眼 | Key that starts and ends the mode; click the box and press any key or mouse button to rebind | 鼠标后侧键 |
 | 标记目标 | Key that marks what is under the crosshair; rebindable the same way | 鼠标中键 |
-| 时间流速 | World speed while marking; raise it for a subtler slowdown | 0.1 |
-| 处决时间流速 | World speed during the firing phase (the yellow tint persists, your own fire rate stays normal); 1 = no slowdown | 0.8 |
+| 处决时间流速 | World speed during the firing phase (the yellow tint persists, your own fire rate stays normal). Very low values also stretch the game's own weapon state machine, so keep it at 0.4 or above; 1 = no slowdown | 0.8 |
 | 进入渐变速度 | How fast time slows when entering; raise for a snappier start | 1 |
 | 退出渐变速度 | How fast time returns to normal when leaving; raise for a snappier exit | 3 |
 | 疲劳每秒消耗 | Fatigue drain while marking, as a percentage of the full bar per real-time second; raise it to pay more | 1 |
@@ -75,9 +74,8 @@ Settings live under **Options → Mod Settings → Dead Eye (死神之眼)**.
 
 ### Tuning
 
-The defaults aim for RDR2 feel at a tenth speed. If it does not feel right, adjust these only — changes apply on the next activation:
+The defaults aim for an RDR2 feel: a quick 0.1x draw reveal, then a near-frozen 0.01x marking phase. The remaining knobs are a handful — changes apply on the next activation:
 
-- **Too slow to aim comfortably**: raise "时间流速" towards 0.2-0.3.
 - **Fires too early / too late after exiting**: the sequence waits for the revolver's own firing rate; the "退出渐变速度" only affects the time restore, not the shots.
 
 ### Compatibility
@@ -117,13 +115,13 @@ MIT — see [LICENSE](LICENSE).
 
 **子弹时间**
 
-- 携带左轮时按下鼠标后侧键——世界放慢到十分之一速，画面染黄，标志性启动音效响起，就是大镖客里死神之眼的味道。
+- 携带左轮时按下鼠标后侧键——左轮若还在背包里会当场拔出，世界以十分之一速播 0.7 秒（拔枪亮相），画面染黄，标志性启动音效响起，就是大镖客里死神之眼的味道；0.7 秒后世界固定降到 0.01 倍——剩下的抬枪动作会在极慢的流速里一路贯穿整个标记过程。
 - 准星对着活物按下鼠标中键——它身上出现一个红色标记并跟着动物移动，同时一声短音效确认标记成功。
 - 同一只动物可以标多次，也可以标多只——标记总数永远不会超过左轮弹巢里剩下的子弹数。
 
 **处决**
 
-- 再按一次鼠标后侧键——**结束标记环节，直接进入处决**：黄色滤镜与时间放慢一直持续到处决结束（若一个都没标，同一按键则立刻结束死神之眼）。mod 替你拔出左轮（如果不在手上），视角通过游戏自带的过场演出视角系统先甩向第一个标记；准星到位后立刻以武器原生满射速逐个开火，视角在目标之间如「甩枪」般连续平滑掠过——甩动节奏与射速匹配，恰好在每个目标开火瞬间到位，而不是走走停停地跳转。**放慢只作用于世界：人物自身的拔枪、开火动作与射速都以正常速率进行。**
+- 再按一次鼠标后侧键——**结束标记环节，直接进入处决**：黄色滤镜与时间放慢一直持续到处决结束（若一个都没标，同一按键则立刻结束死神之眼）。左轮在进入标记时就已经拔出。视角通过游戏自带的过场演出视角系统先甩向第一个标记；准星到位后立刻以武器原生满射速逐个开火，视角在目标之间如「甩枪」般连续平滑掠过——甩动节奏与射速匹配。**放慢只作用于世界：人物自身的拔枪、开火动作与射速都以正常速率进行。**
 - 每发弹丸在出膛瞬间被重定向到**提前量拦截点**——根据动物当前移动速度与左轮出膛速度（含重力下坠）计算「子弹到达时它会在哪」——所以奔跑中的目标也能标头打头、标身打身。游戏自己的伤害、失血、要害判定和技能经验全部原样生效。
 - 标记期间疲劳按真实时间每秒消耗总量的一定百分比（默认 1%，满疲劳约 100 秒耗空），结束立刻恢复——中途力竭会自动收招，完全力竭时根本进不了模式。
 
@@ -147,7 +145,7 @@ MIT — see [LICENSE](LICENSE).
 ### 使用
 
 1. 携带设置里选定的那把左轮（放背包里也行）。
-2. 按鼠标后侧键——时间放慢，画面变黄，屏幕出现「死神之眼 · 标记目标」。
+2. 按鼠标后侧键——时间放慢；左轮若还在背包里会当场拔出来；画面变黄，屏幕出现「死神之眼 · 标记目标」。前 0.7 秒是 0.1 倍，之后世界固定降到 0.01 倍，剩下的抬枪动作在极慢的流速里贯穿整个标记过程。
 3. 准星对准动物按鼠标中键——出现红色标记，可一直标到上限。
 4. 再按一次鼠标后侧键——结束标记、进入处决；黄滤镜和慢动作持续到处决结束，人物动作保持正常速率。若没有标记，则立刻结束死神之眼。
 
@@ -160,8 +158,7 @@ MIT — see [LICENSE](LICENSE).
 | 绑定的左轮手枪 | 选择哪把左轮能触发模式；其余三把不会被它响应 | 左轮手枪 |
 | 进入 / 退出死神之眼 | 开启和结束模式的键；点输入框再按任意键或鼠标键可重绑 | 鼠标后侧键 |
 | 标记目标 | 把准星下的目标标记下来的键；重绑方式相同 | 鼠标中键 |
-| 时间流速 | 标记期间的世界流速；调大则减速更轻 | 0.1 |
-| 处决时间流速 | 处决期间的世界流速（黄滤镜延续，人物开火保持正常速率）；1 = 不放慢 | 0.8 |
+| 处决时间流速 | 处决期间的世界流速（黄滤镜延续，人物开火保持正常速率）。过低的值会连带拖慢游戏自身的持枪状态机，建议 ≥0.4；1 = 不放慢 | 0.8 |
 | 进入渐变速度 | 进入时时间放慢的快慢；调大更干脆 | 1 |
 | 退出渐变速度 | 退出时时间恢复的快慢；调大更干脆 | 3 |
 | 疲劳每秒消耗 | 标记期间每秒（真实时间）消耗疲劳上限的百分比；调大付出更多 | 1 |
@@ -172,9 +169,8 @@ MIT — see [LICENSE](LICENSE).
 
 ### 按症状调参
 
-默认按大镖客观感取十分之一速。如果手感不对，只调这几项即可，下次进入模式生效：
+默认按大镖客观感取：0.1 倍速的拔枪亮相，随后是近乎凝固的 0.01 倍标记阶段。可调的只剩下面这些，下次进入模式生效：
 
-- **慢到瞄不准**：把「时间流速」往 0.2-0.3 调。
 - **处决节奏不对**：射击间隔由左轮自身的射速决定（慢动作下人物以正常速率开枪，射速不变）；「退出渐变速度」只影响处决结束后的时间恢复。
 
 ### 兼容性

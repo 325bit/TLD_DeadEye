@@ -26,8 +26,11 @@ internal static class DeadEyeManager
     private static float _targetDeadline;
     private static float _sequenceDeadline;
 
-    private const float TargetWaitSeconds = 4f;   // unscaled: max wait per target
-    private const float SequenceWatchdog = 20f;   // unscaled: whole sequence abort
+    private const float TargetWaitSeconds = 8f;   // unscaled: max wait per target (generous: the player's state machine runs on scaled time)
+    private const float SequenceWatchdog = 30f;   // unscaled: whole sequence abort
+    private const float FocusedMarkingScale = 0.01f;  // marking speed once the revolver is revealed (not user-tunable)
+    private const float RevealTimeScale = 0.1f;       // draw reveal speed for the first RevealSeconds (not user-tunable)
+    private const float RevealSeconds = 0.7f;         // unscaled: how long the reveal speed lasts after activation
     private const float FirstGlideSeconds = 0.55f; // opening swing duration (game-native tween)
     private const float MaxSwingDegPerSec = 400f; // hard ceiling: a segment never whips faster than this
     private const float MinSegmentSeconds = 0.03f; // one frame-ish floor for a swing segment
@@ -38,6 +41,7 @@ internal static class DeadEyeManager
     private const float TrackReissueMinSeconds = 0.12f; // and at most this often (storm guard; re-issues are dead-frame-free via the pre-advanced start)
     private const float VelocitySampleSeconds = 0.25f; // real-time gap between the two root-position samples that freeze a target's velocity
     private const float AimPointTtl = 0.5f;       // unscaled: how long a committed aim point stays valid
+    private const float MaxAnimCompensation = 20f; // Animator.speed ceiling: must cover 1/0.05, i.e. the whole slider range
 
     private static float _nextLookAtIssue;        // unscaled: when the running glide expires
     private static bool _firstGlideDone;          // false until glide #1 of a sequence has played out
@@ -56,6 +60,8 @@ internal static class DeadEyeManager
     private static float _velFirstUnscaled;
     private static bool _interceptReady;          // true once the current mark's velocity is frozen
     private static bool _lastCameraPhase;         // camera phase currently in force (false = mark body, true = intercept)
+    private static bool _awaitingDraw;            // marking still runs at the draw speed until the revolver is up
+    private static float _drawDeadline;           // unscaled: fallback deadline for the draw phase
 
     /// <summary>Index of the mark currently being fired at (-1 when not firing).</summary>
     internal static int CurrentFireIndex => State == DeadEyeState.Firing ? _fireIndex : -1;
@@ -142,6 +148,17 @@ internal static class DeadEyeManager
         }
 
         var settings = DeadEyeMod.Settings!;
+
+        // Reveal phase: the draw speed only runs until the muzzle clears the screen; after
+        // that the marking speed takes over and the rest of the raise crawls through the
+        // whole marking phase (the slow-draw close-up). Time-driven because the game
+        // exposes no "weapon raised" flag — the animation is what the player is watching.
+        if (_awaitingDraw && Time.unscaledTime >= _drawDeadline)
+        {
+            _awaitingDraw = false;
+            TimeScaler.LerpTo(FocusedMarkingScale, settings.EnterLerpSpeed);
+            ModLog.Info($"revolver revealed, marking speed -> {FocusedMarkingScale:F3}");
+        }
 
         if (KeyPressed(settings.ToggleKey))
         {
@@ -336,9 +353,14 @@ internal static class DeadEyeManager
         shooter.m_NextAllowedFireTime = Time.time;
         shooter.Fire();
         // The interval Fire() pushes onto the gate is the vanilla fire rate expressed in
-        // scaled-time units — vanilla always runs at scale 1, so the number IS the real
-        // interval. Use it as-is (no rescaling): the player keeps the vanilla real rate.
+        // SCALED seconds (vanilla always runs at scale 1, so the number IS the real
+        // interval). Left alone under the execution slowdown the game would advance only
+        // `scale` seconds per real second, stretching every shot by 1/scale — the "fire
+        // rate got slower during the execution" report. Compress the gate by the owned
+        // scale so the REAL wait equals the vanilla interval again.
         float intervalReal = Mathf.Max(0f, shooter.m_NextAllowedFireTime - Time.time);
+        float ts = Mathf.Max(0.001f, TimeScaler.Value);
+        shooter.m_NextAllowedFireTime = Time.time + intervalReal * ts;
         _nextShotUnscaled = Time.unscaledTime + Mathf.Max(0.05f, intervalReal);
         ModLog.Info($"shot {_fireIndex + 1}/{_marks.Count} fired (lead {mark.Velocity.magnitude:F1} m/s, intercept {(intercept - aimPoint).magnitude:F2} m off current pos, next in {intervalReal:F2}s real)");
         AdvanceTarget("shot fired");
@@ -369,7 +391,9 @@ internal static class DeadEyeManager
         if (anim == null || anim.m_Animator == null)
             return;
         float s = TimeScaler.Value; // owned value, not the (externally stomped) engine readback
-        anim.m_Animator.speed = on && s > 0.01f ? 1f / s : 1f;
+        // Clamped: at the focused marking scale an unclamped 1/s would be 100x, and
+        // the ramp into the execution would visibly fast-forward every animation.
+        anim.m_Animator.speed = on && s > 0.001f ? Mathf.Clamp(1f / s, 1f, MaxAnimCompensation) : 1f;
     }
 
     /// <summary>
@@ -379,7 +403,7 @@ internal static class DeadEyeManager
     /// Time.timeScale: a stomped readback would shrink every glide and read as a teleport.
     /// </summary>
     private static float RealToScaled(float realSeconds)
-        => realSeconds * Mathf.Max(0.05f, TimeScaler.Value);
+        => realSeconds * Mathf.Max(0.001f, TimeScaler.Value);
 
     private static void TryEnter()
     {
@@ -412,12 +436,23 @@ internal static class DeadEyeManager
 
         var fatigueNow = GameManager.GetFatigueComponent();
 
-        // NOTE: no auto-draw here. The revolver stays wherever it is (hands or backpack)
-        // during bullet time; drawing happens only when the firing sequence starts.
-        TimeScaler.LerpTo(settings.TargetTimeScale, settings.EnterLerpSpeed);
+        // Draw the revolver AT ACTIVATION when it is still stowed. RevealTimeScale only
+        // covers the REVEAL — the moment the muzzle clears the bottom of the screen
+        // (RevealSeconds); the scale then drops to FocusedMarkingScale so the REST of the
+        // raise plays out far slower and spans the whole marking phase, which is the
+        // slow-draw close-up. A player already holding the gun skips the reveal.
+        _awaitingDraw = !GunResolver.IsInHands(_boundGun);
+        if (_awaitingDraw)
+        {
+            GameManager.GetPlayerManagerComponent().EquipItem(_boundGun, false);
+            _drawDeadline = Time.unscaledTime + RevealSeconds;
+        }
+
+        TimeScaler.LerpTo(_awaitingDraw ? RevealTimeScale : FocusedMarkingScale,
+                          settings.EnterLerpSpeed);
         Overlay.SetOverlay(settings.YellowOverlay && settings.OverlayOpacity > 0f);
         State = DeadEyeState.Marking;
-        ModLog.Info($"Dead Eye entered: cap={MarkCap}, bound={GunResolver.BoundGearName}, fatigue norm={fatigueNow?.GetNormalizedFatigue():F3}");
+        ModLog.Info($"Dead Eye entered: cap={MarkCap}, bound={GunResolver.BoundGearName}, draw={_awaitingDraw}, fatigue norm={fatigueNow?.GetNormalizedFatigue():F3}");
         Overlay.SetMessage($"死神之眼 · 标记目标（0/{MarkCap}）", 2.5f);
         ModAudio.PlayEnter();
     }
@@ -428,6 +463,7 @@ internal static class DeadEyeManager
         Overlay.SetOverlay(false);
         _marks.Clear();
         MarkCap = 0;
+        _awaitingDraw = false;
         TimeScaler.LerpTo(1f, DeadEyeMod.Settings!.ExitLerpSpeed);
         ModLog.Info("Dead Eye exiting (no marks)");
     }
@@ -439,10 +475,14 @@ internal static class DeadEyeManager
         // ExecutionTimeScale (default 0.8). Only the player is compensated back toward
         // real time (first-person Animator + unscaled fire pacing, see TickFiring).
         var settings = DeadEyeMod.Settings!;
-        TimeScaler.LerpTo(settings.ExecutionTimeScale, settings.EnterLerpSpeed);
+        _awaitingDraw = false; // the draw phase never survives into the execution
+        // Snap, do not ramp: the Animator compensation is 1/scale, so a ramp would leave
+        // the player firing behind a closed animation gate for its whole duration.
+        TimeScaler.SetImmediate(settings.ExecutionTimeScale);
 
-        // Draw the bound revolver now so the raise animation (compensated to real speed)
-        // overlaps the first glide.
+        // Safety: the revolver is normally drawn at activation already, but if the player
+        // stowed it mid-marking this keeps the sequence self-contained. When it is already
+        // in hand nothing happens (no animation, no delay).
         if (_boundGun != null && !GunResolver.IsInHands(_boundGun))
             GameManager.GetPlayerManagerComponent().EquipItem(_boundGun, false);
 
@@ -516,6 +556,7 @@ internal static class DeadEyeManager
         ModAudio.Stop(); // mid-mode cancel: cut the activation sound immediately
         _marks.Clear();
         MarkCap = 0;
+        _awaitingDraw = false;
         _lastAimPoint = null;
         _aimPointExpiry = 0f;
         State = DeadEyeState.Inactive;
@@ -705,7 +746,7 @@ internal static class DeadEyeManager
         var shooter = GameManager.GetVpFPSCamera()?.CurrentShooter;
         if (shooter != null)
         {
-            float ts = Mathf.Max(0.05f, TimeScaler.Value);
+            float ts = Mathf.Max(0.001f, TimeScaler.Value);
             float gate = (shooter.m_NextAllowedFireTime - Time.time) / ts; // scaled -> real
             if (gate > t)
                 t = gate;

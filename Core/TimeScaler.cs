@@ -29,6 +29,20 @@ internal static class TimeScaler
         _owned = true;
     }
 
+    /// <summary>
+    /// Jump straight to <paramref name="value"/>. Used when entering the execution: the
+    /// player's animation speed is derived from the scale (1/scale), so ramping it would
+    /// leave the Animator compensation wrong for the whole ramp — the fire gate then stays
+    /// closed and the targets time out one after another.
+    /// </summary>
+    internal static void SetImmediate(float value)
+    {
+        _target = value;
+        _value = value;
+        _owned = true;
+        Reassert();
+    }
+
     /// <summary>Advance the lerp on unscaled time (call once per manager Tick).</summary>
     internal static void Advance()
     {

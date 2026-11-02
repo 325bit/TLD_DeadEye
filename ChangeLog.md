@@ -1,5 +1,27 @@
 # ChangeLog
 
+## 0.5.8
+
+- The draw-reveal timing is no longer tunable: 拔枪秒流速 and 拔枪特写时长 are gone, fixed at **0.1x for 0.7 s** (constants `RevealTimeScale` / `RevealSeconds`). After the reveal the marking phase runs at the fixed 0.01x.
+- Settings now only expose what is worth tuning per player: the bound revolver, two keys, execution speed, the two transition speeds, fatigue cost, tint, volume and the verbose flag.
+
+## 0.5.7
+
+- The fixed marking speed after the reveal is now **0.01** (was 0.025), so the remaining raise really does crawl through the whole marking phase.
+- Internal: every place that divides by or converts through the owned scale used a `0.05` floor, which at 0.01 would have silently substituted 0.05 — stretching every glide and fire-gate conversion. The floor is now `0.001`, so the conversions stay correct at any marking speed. The execution phase is unaffected (it runs at its own scale, 0.1-1).
+
+## 0.5.6
+
+- **Fixed "3 marks, only 1 shot" during the execution.** Live log: `allowedToFire=False` for the full target window with `ts=0.10` and `animSpeed=4.00`. Two things were wrong. (1) `PlayerAnimation.Update` writes the Animator speed itself EVERY frame, so the compensation set from our tick was overwritten before the Animator was evaluated — the raise/fire animations really ran at `scale x 1`, i.e. ten times too slow at 0.1, and the fire gate (`IsAllowedToFire` is a pure "current animation state == fire-ready state" test) never reopened. (2) Even the value we did set was clamped to 4x. Both fixed: a postfix on `PlayerAnimation.Update` re-applies `1/scale` right after the game's own write, and the ceiling is now 20x so the whole 0.05-1 range is honoured exactly.
+- Entering the execution now SNAPS the scale (`TimeScaler.SetImmediate`) instead of lerping: the compensation is `1/scale`, so a ramp leaves it wrong for the whole ramp duration.
+- Target window widened 4 s -> 8 s and the sequence watchdog 20 s -> 30 s: the game's own weapon state machine advances on scaled time, so a very low execution scale can still need more real time than before even with the animations compensated.
+- Settings simplified: 拔枪后流速 is gone — the marking speed after the reveal is fixed at **0.025**. The only scale the player tunes is 拔枪秒流速 (the first-second reveal), still 0.05-0.5.
+
+## 0.5.5
+
+- **Two-stage marking slowdown with a drawn-out reveal.** Entering the mode used to leave the revolver stowed until the execution; now it is drawn at activation. The marking speed (时间流速, 0.1x) only covers the REVEAL — one second, i.e. until the muzzle clears the bottom of the screen in the reference footage — and then drops to the new 拔枪后流速 (default 0.025, a quarter of 0.1), so the rest of the raise crawls through the whole marking phase and the slow draw stays visible instead of finishing early. 拔枪特写时长 (default 1 s) tunes the reveal. A player who is already holding the revolver skips the reveal and gets the deeper speed immediately.
+- **Fixed the fire rate slowing down during the execution.** `Fire()` pushes the vanilla interval onto `m_NextAllowedFireTime`, which lives on the SCALED clock. Under a 0.8 execution scale the same number therefore stretched the real wait by 1/0.8 = 25 %, so every shot came 25 % late even though our own pacing ran on unscaled time. The gate is now compressed by the owned scale right after `Fire()` (`gate = now + interval x scale`), so the real interval equals the vanilla one at any execution speed. The first-person Animator compensation (`speed = 1/scale`) keeps the draw and fire animations at real speed.
+
 ## 0.5.4
 
 - **Fixed the camera teleports and the dead bullet time — two separate root causes, both confirmed by disassembly / live logs.**

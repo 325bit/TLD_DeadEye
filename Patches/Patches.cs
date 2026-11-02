@@ -4,6 +4,39 @@ using UnityEngine;
 namespace DeadEye.Patches;
 
 /// <summary>
+/// Keeps the first-person Animator at real speed while the execution runs slowed down.
+/// `PlayerAnimation.Update` writes the Animator speed itself every frame, so the value set
+/// from the manager tick is overwritten before the Animator is evaluated (live log: at an
+/// execution scale of 0.1 the fire gate stayed closed for 4 s per target and 3 marks
+/// produced 1 shot). A postfix re-applies `1/scale` right after the game's own write.
+/// Clamped at 20x, which covers the whole execution-scale range (0.05-1).
+/// </summary>
+[HarmonyPatch(typeof(PlayerAnimation), "Update")]
+internal static class PlayerAnimSpeedPatch
+{
+    private static void Postfix(PlayerAnimation __instance)
+    {
+        try
+        {
+            if (DeadEye.Core.DeadEyeManager.State != DeadEye.Core.DeadEyeState.Firing)
+                return;
+            if (__instance == null || __instance.m_Animator == null)
+                return;
+
+            float scale = DeadEye.Core.TimeScaler.Value;
+            if (scale >= 0.99f)
+                return;
+
+            __instance.m_Animator.speed = Mathf.Clamp(1f / scale, 1f, 20f);
+        }
+        catch (System.Exception ex)
+        {
+            ModLog.Error($"animator speed patch failed: {ex}");
+        }
+    }
+}
+
+/// <summary>
 /// Re-asserts the owned bullet-time scale after every InterfaceManager.Update. Other mods
 /// write Time.timeScale from a PREFIX on this very method (TimeAccelerator sets
 /// `Time.timeScale = 1` on every frame while its key is not held), which stamped our
