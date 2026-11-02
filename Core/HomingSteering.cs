@@ -16,7 +16,7 @@ internal static class HomingSteering
 {
     private const float BaseTurnDegPerSec = 400f; // x the strength setting (0.5-2.5 -> 200-1000 deg/s)
     private const float CorrectionGain = 0.4f;    // fraction of the remaining angle corrected per frame
-    private const float LifetimeSeconds = 8f;     // unscaled: a long shot under the slowdown can take seconds
+    internal const float LifetimeSeconds = 8f;     // unscaled: a long shot under the slowdown can take seconds
     private const float MinSpeed = 1f;            // below this the launch force has not landed yet
     private const float AlignWindowSeconds = 0.1f; // real time after spawn in which the muzzle error may be cancelled outright
     private const float SampleSpacing = 0.25f;    // tube-test interval: consecutive r=0.1 spheres overlap without gaps
@@ -626,6 +626,11 @@ internal static class HomingSteering
             }
         }
     }
+
+    /// <summary>Live homing rounds currently tracked — a round leaves this count when it
+    /// is consumed (contact, path test) or expires, which is what the execution hold waits
+    /// on.</summary>
+    internal static int LiveRounds => _entries.Count;
 
     internal static void Clear() => _entries.Clear();
 }

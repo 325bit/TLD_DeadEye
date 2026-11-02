@@ -25,9 +25,12 @@ internal static class DeadEyeManager
     private static int _fireIndex;
     private static float _targetDeadline;
     private static float _sequenceDeadline;
+    private static bool _holdForRounds;           // execution held until the last bullet is consumed
+    private static float _holdDeadline;
 
     private const float TargetWaitSeconds = 8f;   // unscaled: max wait per target (generous: the player's state machine runs on scaled time)
     private const float SequenceWatchdog = 30f;   // unscaled: whole sequence abort
+    private const float HoldGraceSeconds = 1f;    // unscaled: margin past the rounds' own expiry
     private const float FocusedMarkingScale = 0.01f;  // marking speed once the revolver is revealed (not user-tunable)
     private const float RevealTimeScale = 0.1f;       // draw reveal speed for the first RevealSeconds (not user-tunable)
     private const float RevealSeconds = 0.7f;         // unscaled: how long the reveal speed lasts after activation
@@ -585,6 +588,7 @@ internal static class DeadEyeManager
         // real time (first-person Animator + unscaled fire pacing, see TickFiring).
         var settings = DeadEyeMod.Settings!;
         _awaitingDraw = false; // the draw phase never survives into the execution
+        _holdForRounds = false; // a fresh sequence never starts inside the previous hold
         // Snap, do not ramp: the Animator compensation is 1/scale, so a ramp would leave
         // the player firing behind a closed animation gate for its whole duration.
         TimeScaler.SetImmediate(settings.ExecutionTimeScale);
@@ -656,6 +660,26 @@ internal static class DeadEyeManager
 
     private static void FinishFiring()
     {
+        // Hold the execution while the last rounds are still in flight: the slow-mo and
+        // tint end when the LAST bullet is consumed — by the marked animal, by scenery,
+        // or by its own expiry (HomingSteering removes the entry in every case, including
+        // the 8 s no-contact expiry). TickFiring re-enters here every Tick while holding;
+        // without live rounds (vanilla bullet path, homing off, or all rounds gone) the
+        // sequence ends immediately, exactly as it did before the hold existed.
+        if (!_holdForRounds && HomingSteering.LiveRounds > 0)
+        {
+            _holdForRounds = true;
+            _holdDeadline = Time.unscaledTime + HomingSteering.LifetimeSeconds + HoldGraceSeconds;
+            ModLog.Info($"fire sequence fired — holding the execution for {HomingSteering.LiveRounds} live round(s)");
+            Overlay.SetMessage("死神之眼：最后一发", 1f);
+            return; // stay in Firing: the state tick keeps the scale, tint and steering alive
+        }
+
+        if (_holdForRounds && HomingSteering.LiveRounds > 0 && Time.unscaledTime < _holdDeadline)
+            return; // still holding
+
+        bool wasHolding = _holdForRounds;
+        _holdForRounds = false;
         _marks.Clear();
         MarkCap = 0;
         // NOTE: _lastAimPoint is intentionally left to expire via its TTL — the last
@@ -664,7 +688,7 @@ internal static class DeadEyeManager
         Overlay.SetOverlay(false); // the yellow filter ends with the sequence
         State = DeadEyeState.Exiting; // shared restore tail lerps time back to 1
         TimeScaler.LerpTo(1f, DeadEyeMod.Settings!.ExitLerpSpeed);
-        ModLog.Info("fire sequence finished");
+        ModLog.Info(wasHolding ? "fire sequence finished (last round consumed)" : "fire sequence finished");
         Overlay.SetMessage("死神之眼结束", 1.5f);
     }
 
@@ -680,6 +704,7 @@ internal static class DeadEyeManager
         ModAudio.Stop(); // mid-mode cancel: cut the activation sound immediately
         _marks.Clear();
         MarkCap = 0;
+        _holdForRounds = false; // the execution hold dies with the sequence
         _awaitingDraw = false;
         _lastAimPoint = null;
         _aimPointExpiry = 0f;

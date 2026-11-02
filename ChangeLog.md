@@ -1,5 +1,9 @@
 # ChangeLog
 
+## 0.7.5
+
+- **The execution's slow motion now holds until the LAST bullet is consumed.** Previously the time scale started restoring the moment the last shot fired — the round was still in the air while the world snapped back. The firing state (execution scale, yellow tint, in-flight steering) is now held after the sequence fires until HomingSteering reports no live rounds: a round leaves the count when it is consumed by the marked animal, by scenery, or by its own 8 s no-contact expiry, and each of those ends the hold. Without live rounds (vanilla bullet path, homing off) the sequence ends immediately as before; the hold is capped one second past the rounds' own expiry, is reset by every exit path (force exit, scene change, new sequence), and the on-screen message shows 死神之眼：最后一发 while waiting.
+
 ## 0.7.4
 
 - **Rapid fire now actually fires fast: the vanilla post-shot cooldown is overridden while the multiplier is above 1.** The 0.7.3 session measured a 0.52 s median gap at rate 4 even though the other three pacing members were compressed to 0.12 s — the binder was the fourth member nobody had counted: `vp_FPSShooter.IsReloadCooldownActive`, the game's own ~0.5 s post-shot cooldown, which held `pacingOpen` shut for the whole inter-shot window (the "shot gated" diagnostic never fired because pacing itself never opened). At rate > 1 our own unscaled pacing is authoritative and the cooldown is skipped; rate 1 keeps it, restoring the vanilla pace exactly. The reload-in-progress safety is separate (`animOk`) and unchanged.
