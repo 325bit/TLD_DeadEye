@@ -1,11 +1,12 @@
 using UnityEngine;
 using Il2CppTLD.AI;
+using Il2CppInterop.Runtime;
 
 namespace DeadEye.Core;
 
 /// <summary>
-/// Aim model per species. Small prey (grouse, rabbit) is aimed INSIDE the body: 60 % of
-/// the way from the animal's root toward the marked surface. Both alternatives failed on a
+/// Aim model per species. Small prey (grouse, rabbit) is aimed INSIDE the body: part of the
+/// way from the animal's root toward the marked surface (user-tunable ballistics setting). Both alternatives failed on a
 /// body this thin: the marked point sits on the surface (half of any error falls outside
 /// it) and sweeps sideways when the animal turns, and the collider union centre sits off
 /// the animal entirely (its bounds reach well beyond the body), which a 20 cm target
@@ -13,16 +14,11 @@ namespace DeadEye.Core;
 /// </summary>
 internal static class AnimalBody
 {
-    /// <summary>Height clamps for small prey: low enough that a mark on the feet still hits.</summary>
+    /// <summary>Lower height bound for small prey: low enough that a mark on the feet still hits.</summary>
     internal const float PreyMinAimHeight = 0.06f;
-    internal const float PreyMaxAimHeight = 0.28f;
 
-    /// <summary>
-    /// How far from the root toward the marked surface a prey shot is aimed. The crosshair
-    /// lands on the visible SURFACE, and aiming at a surface means half of any error falls
-    /// outside the body, so the point is pulled inward to sit inside it.
-    /// </summary>
-    private const float PreyInwardFraction = 0.6f;
+    /// <summary>Used when the settings panel is not built yet (first frame / menu).</summary>
+    private const float DefaultPreyAimFraction = 0.6f;
 
     /// <summary>Height clamps for large animals, taken from the tested deer behaviour.</summary>
     internal const float LargeMinAimHeight = 0.40f;
@@ -32,31 +28,44 @@ internal static class AnimalBody
     private const float SmallPreyMaxHeight = 0.45f;
 
     /// <summary>
-    /// Aim point for small prey: 60 % of the way from the animal's root toward the marked
-    /// surface, which is inside the body whatever part was marked. Only the VERTICAL part
-    /// is clamped — a pivoted root that sits below the body must not push the point out of
-    /// the top of a 20 cm animal.
+    /// How far from the root toward the marked surface a prey shot is aimed (the ballistics
+    /// setting), read LIVE on every call so moving it applies to the next frame — including
+    /// a shot already in the air — without re-marking. 0 = the root, 1 = the marked surface,
+    /// in between = inside the body.
     /// </summary>
-    internal static Vector3 PreyAimPoint(Transform root, Vector3 localOffset)
+    internal static float PreyAimFraction
+        => Mathf.Clamp(DeadEyeMod.Settings != null
+            ? DeadEyeMod.Settings.PreyAimFraction
+            : DefaultPreyAimFraction, 0f, 1f);
+
+    /// <summary>
+    /// Aim point for small prey: part of the way from the animal's root toward the marked
+    /// surface, which is inside the body whatever part was marked. Only the VERTICAL part is
+    /// shaped, and only from below (a mark on the feet must not aim at the ground): the marked
+    /// point is itself on the body, so 0..1 of the way up can never overshoot it, while an upper
+    /// clamp would push the point UNDER an animal whose root pivot sits low. The offset is
+    /// WORLD space, so a turning animal does not sweep the point sideways.
+    /// </summary>
+    internal static Vector3 PreyAimPoint(Vector3 rootPosition, Vector3 bodyOffset)
     {
-        Vector3 origin = root.position;
-        Vector3 delta = root.TransformPoint(localOffset) - origin;
-        float height = Mathf.Clamp(delta.y * PreyInwardFraction, PreyMinAimHeight, PreyMaxAimHeight);
-        return origin + new Vector3(delta.x, 0f, delta.z) * PreyInwardFraction
-                      + Vector3.up * height;
+        float fraction = PreyAimFraction;
+        float height = Mathf.Max(bodyOffset.y * fraction, PreyMinAimHeight);
+        return rootPosition + new Vector3(bodyOffset.x, 0f, bodyOffset.z) * fraction + Vector3.up * height;
     }
 
     /// <summary>
     /// Height above the root used by in-flight steering on large animals, where the marked
     /// point is deliberately NOT followed (it sweeps sideways when the animal turns).
     /// </summary>
-    internal static float LargeAimHeight(Vector3 localOffset)
-        => Mathf.Clamp(localOffset.magnitude, LargeMinAimHeight, LargeMaxAimHeight);
+    internal static float LargeAimHeight(Vector3 bodyOffset)
+        => Mathf.Clamp(bodyOffset.magnitude, LargeMinAimHeight, LargeMaxAimHeight);
 
     /// <summary>
-    /// Species test. The concrete AI classes are checked first, then the prefab name, and
-    /// finally the measured body height: an unrecognised species whose body is lower than
-    /// the large-animal height offset is too thin to aim over, so it behaves as prey.
+    /// Species test. The concrete AI classes are asked first — through <c>TryCast</c>, which
+    /// consults the RUNTIME class, because `GetComponent&lt;BaseAi&gt;()` returns a wrapper of
+    /// exactly the requested type and `is AiRabbit` is then false for every animal. Then the
+    /// prefab name, and finally the measured body height: an unrecognised species whose body
+    /// is lower than the large-animal height offset is too thin to aim over.
     /// </summary>
     internal static bool IsSmallPrey(BaseAi? ai)
     {
@@ -65,7 +74,7 @@ internal static class AnimalBody
 
         try
         {
-            if (ai is AiRabbit || ai is AiPtarmigan)
+            if (ai.TryCast<AiRabbit>() != null || ai.TryCast<AiPtarmigan>() != null)
                 return true;
 
             var go = ai.gameObject;
@@ -84,6 +93,27 @@ internal static class AnimalBody
         {
             ModLog.Debug($"small prey test failed: {ex.Message}");
             return false;
+        }
+    }
+
+    /// <summary>
+    /// The animal's RUNTIME class name. <c>GetType()</c> only ever reports `BaseAi` (the
+    /// interop wrapper is created for the type it was requested as), so it cannot be used to
+    /// tell a rabbit from a deer in a log. Diagnostics only.
+    /// </summary>
+    internal static string SpeciesName(BaseAi? ai)
+    {
+        try
+        {
+            if (ai == null)
+                return "null";
+
+            string? name = IL2CPP.il2cpp_class_get_name_(ai.ObjectClass);
+            return string.IsNullOrEmpty(name) ? "unknown" : name;
+        }
+        catch (System.Exception ex)
+        {
+            return $"unknown({ex.Message})";
         }
     }
 

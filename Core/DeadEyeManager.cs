@@ -39,7 +39,9 @@ internal static class DeadEyeManager
     private const float ArrivedDeg = 0.5f;        // no new segment is issued this close to the target
     private const float TrackReissueDriftDegrees = 5f; // re-issue the pursuit glide when the endpoint drifted this far off its captured value
     private const float TrackReissueMinSeconds = 0.12f; // and at most this often (storm guard; re-issues are dead-frame-free via the pre-advanced start)
-    private const float VelocitySampleSeconds = 0.25f; // real-time gap between the two root-position samples that freeze a target's velocity
+    private const float VelocitySampleSeconds = 0.1f; // real-time gap between the two root-position samples; only a cross-check for the AI velocity, and it finishes inside glide #1
+    private const float MinVelocityGameSeconds = 0.02f; // the root difference is meaningless on a shorter GAME-time window
+    private const float MaxFallbackSampleSeconds = 0.5f; // ceiling for extending that window when the AI velocity is unreadable
     private const float AimPointTtl = 0.5f;       // unscaled: how long a committed aim point stays valid
     private const float MaxAnimCompensation = 20f; // Animator.speed ceiling: must cover 1/0.05, i.e. the whole slider range
 
@@ -51,13 +53,15 @@ internal static class DeadEyeManager
     private static float _nextShotUnscaled;       // unscaled: when the next shot of the sequence may fire
     private static float _nextGateLog;            // unscaled: throttle for the shot-gated diagnostic line
 
-    // Two-sample velocity measurement for the CURRENT mark (uniform-linear assumption):
-    // sample the AI root once when the target becomes active, again after the interval,
-    // freeze the vector — the intercept is then stable and the camera never chases a
-    // re-estimated direction (the source of the teleport-like spikes).
+    // Velocity measurement for the CURRENT mark. The AI's own velocity is taken as the
+    // primary source (it already lives in game seconds); a root-position pair is kept purely
+    // as a cross-check and a fallback, and its denominator is GAME time — measuring the
+    // distance over real seconds silently scaled the speed by the time scale, which is
+    // harmless on a deer and fatal on a rabbit.
     private static bool _velFirstTaken;
     private static Vector3 _velFirstPos;
     private static float _velFirstUnscaled;
+    private static float _velFirstGame;
     private static bool _interceptReady;          // true once the current mark's velocity is frozen
     private static bool _lastCameraPhase;         // camera phase currently in force (false = mark body, true = intercept)
     private static bool _awaitingDraw;            // marking still runs at the draw speed until the revolver is up
@@ -87,11 +91,21 @@ internal static class DeadEyeManager
     /// </summary>
     internal static GameObject? PendingHomingTarget;
 
-    /// <summary>Body point offset (animal local space) that goes with <see cref="PendingHomingTarget"/>.</summary>
-    internal static Vector3 PendingHomingOffset;
+    /// <summary>
+    /// Body point offset (WORLD space, from the animal's root) that goes with
+    /// <see cref="PendingHomingTarget"/>.
+    /// </summary>
+    internal static Vector3 PendingHomingBodyOffset;
 
     /// <summary>Grouse / rabbit: the projectile converges on the body centre, not the mark.</summary>
     internal static bool PendingHomingSmallPrey;
+
+    /// <summary>
+    /// The target's velocity (GAME seconds) as measured at the fire moment, which goes with
+    /// <see cref="PendingHomingTarget"/> as the steering FALLBACK. In-flight steering re-reads
+    /// the live velocity every frame and only falls back to this when the animal is unreadable.
+    /// </summary>
+    internal static Vector3 PendingHomingVelocity;
 
     /// <summary>Aim point for the camera driver while the firing sequence runs (null otherwise).</summary>
     internal static Vector3? CurrentAimPoint
@@ -243,20 +257,49 @@ internal static class DeadEyeManager
             return;
         }
 
-        // Two-sample velocity window for this mark (uniform-linear assumption), started
-        // immediately so it runs DURING glide #1 / the pursuit swing instead of delaying
-        // the shot behind them.
+        // Velocity for this mark, taken while glide #1 plays so the shot is never delayed
+        // behind it. Normally only the frozen value is read (see Mark.Velocity) — an input
+        // that changes every frame made the camera chase a jittering endpoint.
         if (!_velFirstTaken)
         {
             _velFirstPos = mark.RootPosition;
             _velFirstUnscaled = Time.unscaledTime;
+            _velFirstGame = Time.time;
             _velFirstTaken = true;
         }
         else if (!_interceptReady && Time.unscaledTime - _velFirstUnscaled >= VelocitySampleSeconds)
         {
-            mark.SetVelocity(mark.RootPosition - _velFirstPos, Time.unscaledTime - _velFirstUnscaled);
-            _interceptReady = true;
-            ModLog.Debug($"velocity frozen for target {_fireIndex} ({mark.Velocity.magnitude:F1} m/s)");
+            float realElapsed = Time.unscaledTime - _velFirstUnscaled;
+            float gameSeconds = Time.time - _velFirstGame;
+            Vector3 aiVelocity = AnimalVelocity.FromAi(mark.Ai, out string source);
+            bool aiOk = source == "ai";
+
+            // The pair is the only fallback, so a failed AI read keeps the window open until
+            // it holds enough GAME time to mean something. Capped, because a permanently
+            // failed read would otherwise stall every shot behind it.
+            if (aiOk || gameSeconds >= MinVelocityGameSeconds || realElapsed >= MaxFallbackSampleSeconds)
+            {
+                Vector3 pairedVelocity = gameSeconds >= MinVelocityGameSeconds
+                    ? AnimalVelocity.FromRootDelta(_velFirstPos, mark.RootPosition, gameSeconds)
+                    : Vector3.zero;
+
+                // A failed AI read ("none") falls back to the pair. A ZERO AI velocity is a real
+                // standstill and must not be replaced by pair noise, so only the source decides.
+                mark.FreezeVelocity(aiOk ? aiVelocity : pairedVelocity, aiOk ? "ai" : "root-delta");
+                _interceptReady = true;
+
+                // Both numbers plus the angle between them: a matching angle with a different
+                // magnitude means the pair averaged a hop-and-freeze cycle, while a mismatched
+                // angle means one of the two sources is not the animal's velocity at all.
+                float disagreement = aiVelocity.magnitude > 0.5f && pairedVelocity.magnitude > 0.5f
+                    ? Vector3.Angle(aiVelocity, pairedVelocity)
+                    : -1f;
+                ModLog.Info($"velocity frozen (target {_fireIndex}, {SafeName(mark)}): " +
+                            $"ai {aiVelocity.magnitude:F1} m/s [{source}] vs root-delta {pairedVelocity.magnitude:F1} m/s " +
+                            $"over {gameSeconds:F3} game s ({realElapsed:F2} real s), " +
+                            $"angle {(disagreement < 0f ? "n/a" : $"{disagreement:F0} deg")} " +
+                            $"-> using {mark.Velocity.magnitude:F1} m/s from {mark.VelocitySource}");
+            }
         }
 
         // Rhythm: the FIRST shot waits for the first look-at glide to play out, so the
@@ -358,9 +401,31 @@ internal static class DeadEyeManager
         if (!pacingOpen || !animOk)
             return false;
 
+        // The lead is about to be built on a sample taken 0.3-0.5 s ago (the sampling window
+        // runs inside glide #1), and a running grouse covers 4-7 m in that time — more than
+        // its whole body. Re-read here, once per committed shot: the fresh vector feeds both
+        // the intercept and the in-flight steering, so neither points at where the animal was.
+        Vector3 frozenVelocity = mark.Velocity;
+        string frozenSource = mark.VelocitySource;
+        float staleAge = mark.VelocityAge; // must be read BEFORE the refresh, which resets it
+        Vector3 fireVelocity = AnimalVelocity.Resolve(mark.Ai, mark.VelocityRoot, mark.VelocityGameTime,
+                                                      mark.RootPosition, frozenVelocity, out string fireSource);
+        mark.RefreshVelocity(fireVelocity, fireSource);
+
+        // Diagnostic: a LARGE angle means the animal turned or accelerated while the crosshair
+        // was on its way (so no uniform-linear lead could have been right), a SMALL angle with
+        // misses means the model is fine and the residual has another cause.
+        float velocityDrift = frozenVelocity.magnitude > 0.5f && fireVelocity.magnitude > 0.5f
+            ? Vector3.Angle(frozenVelocity, fireVelocity)
+            : -1f;
+        ModLog.Info($"v at fire (target {_fireIndex}, {SafeName(mark)}): frozen {frozenVelocity.magnitude:F1} m/s [{frozenSource}] " +
+                    $"-> now {fireVelocity.magnitude:F1} m/s [{fireSource}], " +
+                    $"angle {(velocityDrift < 0f ? "n/a" : $"{velocityDrift:F0} deg")}, " +
+                    $"{staleAge:F2} real s stale");
+
         // Recompute the intercept at the fire moment and snapshot it: the redirect patches
         // aim the fresh projectile exactly there, independent of where the camera is.
-        Vector3 intercept = ComputeIntercept(mark, aimPoint);
+        Vector3 intercept = ComputeIntercept(mark, aimPoint, out float flightTime);
         _lastAimPoint = intercept;
         _aimPointExpiry = Time.unscaledTime + AimPointTtl;
 
@@ -371,8 +436,9 @@ internal static class DeadEyeManager
         // Tell the projectile patch what to chase: the animal itself, so the bullet corrects
         // in flight instead of relying on the lead prediction being perfect.
         PendingHomingTarget = DeadEyeMod.Settings?.HomingBullets == true ? mark.Ai.gameObject : null;
-        PendingHomingOffset = mark.LocalOffset;
+        PendingHomingBodyOffset = mark.BodyOffset;
         PendingHomingSmallPrey = mark.IsSmallPrey;
+        PendingHomingVelocity = mark.Velocity;
         shooter.Fire();
         PendingHomingTarget = null; // consumed synchronously by the Fire prefix
         // The interval Fire() pushes onto the gate is the vanilla fire rate expressed in
@@ -385,20 +451,33 @@ internal static class DeadEyeManager
         float ts = Mathf.Max(0.001f, TimeScaler.Value);
         shooter.m_NextAllowedFireTime = Time.time + intervalReal * ts;
         _nextShotUnscaled = Time.unscaledTime + Mathf.Max(0.05f, intervalReal);
+        // Diagnostics: the velocity and its source, the flight time it produced, and the two
+        // distances that decide a small-prey hit — the lead the shot commits to, and how far
+        // the aim point sits from the part the player actually marked. A miss is then one of
+        // three things and the numbers say which: velocity wrong, aim point wrong, or the
+        // animal accelerated after the freeze. The aim fraction is printed because it is the
+        // one input the player can change live.
+        Vector3 markedPoint = mark.TryGetWorldPoint(out Vector3 mp) ? mp : aimPoint;
         ModLog.Info($"shot {_fireIndex + 1}/{_marks.Count} fired ({(mark.IsSmallPrey ? "small prey" : "large animal")}, " +
-                    $"lead {mark.Velocity.magnitude:F1} m/s, intercept {(intercept - aimPoint).magnitude:F2} m off current pos, next in {intervalReal:F2}s real)");
+                    $"v {mark.Velocity.magnitude:F1} m/s [{mark.VelocitySource}], flight {flightTime * 1000f:F0} ms, " +
+                    $"lead {(intercept - aimPoint).magnitude:F2} m, aim {(aimPoint - markedPoint).magnitude:F2} m from the mark" +
+                    $"{(mark.IsSmallPrey ? $", fraction {AnimalBody.PreyAimFraction:F2}" : string.Empty)}, " +
+                    $"next in {intervalReal:F2}s real)");
         AdvanceTarget("shot fired");
         return true;
     }
 
     /// <summary>Predicted world point the shot should be aimed at (lead + gravity drop).</summary>
     private static Vector3 ComputeIntercept(Mark mark, Vector3 aimPoint)
+        => ComputeIntercept(mark, aimPoint, out _);
+
+    private static Vector3 ComputeIntercept(Mark mark, Vector3 aimPoint, out float flightTime)
     {
         var camera = GameManager.GetMainCamera();
         Vector3 muzzlePos = camera != null ? camera.transform.position : GameManager.GetPlayerTransform().position;
         float launchSpeed = Ballistics.MuzzleVelocityFor(
             GameManager.GetVpFPSCamera()?.CurrentShooter?.m_Weapon?.m_GunItem?.name);
-        return Ballistics.PredictIntercept(muzzlePos, aimPoint, mark.Velocity, launchSpeed);
+        return Ballistics.PredictIntercept(muzzlePos, aimPoint, mark.Velocity, launchSpeed, out flightTime);
     }
 
     // ---------------------------------------------------------------- Enter / exit
@@ -532,7 +611,7 @@ internal static class DeadEyeManager
         Overlay.SetMessage("处决 · 开火", 1.2f);
     }
 
-    /// <summary>Restart the two-sample velocity window for the newly active mark.</summary>
+    /// <summary>Restart the velocity measurement window for the newly active mark.</summary>
     private static void ResetVelocitySampling()
     {
         _velFirstTaken = false;
@@ -540,6 +619,21 @@ internal static class DeadEyeManager
         _lastCameraPhase = false;
         _velFirstPos = default;
         _velFirstUnscaled = 0f;
+        _velFirstGame = 0f;
+    }
+
+    /// <summary>Prefab name for the diagnostics, without risking a null chain in a log line.</summary>
+    private static string SafeName(Mark mark)
+    {
+        try
+        {
+            var ai = mark.Ai;
+            return ai != null && ai.gameObject != null ? ai.gameObject.name : "?";
+        }
+        catch (System.Exception)
+        {
+            return "?";
+        }
     }
 
     private static void AdvanceTarget(string reason)
@@ -631,12 +725,13 @@ internal static class DeadEyeManager
             _marks.Add(mark);
             Overlay.SetMessage($"已标记 {_marks.Count}/{MarkCap}", 1.2f);
             ModAudio.PlayMark();
-            // Triage line: the AI type decides the aim model, and the distance between the
-            // shot point and the point the player actually aimed at says whether the model
-            // moved the round off the animal. (A prey body is ~0.2 m wide.)
+            // Triage line: the runtime species decides the aim model (the interop wrapper
+            // only ever reports BaseAi), and the distance between the shot point and the
+            // point the player actually aimed at says whether the model moved the round off
+            // the animal. (A prey body is ~0.2 m wide.)
             mark.TryGetAimPoint(out Vector3 markAim);
-            ModLog.Debug($"marked {ai.gameObject.name} [{ai.GetType().Name}] " +
-                         $"{(mark.IsSmallPrey ? "small prey: body axis" : "large animal: marked point")} " +
+            ModLog.Debug($"marked {ai.gameObject.name} [{AnimalBody.SpeciesName(ai)}] " +
+                         $"{(mark.IsSmallPrey ? $"small prey: {AnimalBody.PreyAimFraction:F2} from root" : "large animal: marked point")} " +
                          $"({_marks.Count}/{MarkCap}), aim {(markAim - hit.point).magnitude:F2} m from the crosshair, " +
                          AnimalBody.DescribeBody(ai));
             return;
@@ -704,9 +799,9 @@ internal static class DeadEyeManager
         float remainingDeg = Quaternion.Angle(fpsCamera.transform.rotation, markRot);
 
         bool expired = Time.unscaledTime >= _segEndUnscaled;
-        float drift = expired
-            ? float.MaxValue
-            : Quaternion.Angle(_segEndpointRot, markRot);
+        // Always a real angle: a MaxValue sentinel for "expired" used to leak into the log
+        // as 3.4e38deg on every re-issue, which is the normal path, so it was unreadable.
+        float drift = Quaternion.Angle(_segEndpointRot, markRot);
         bool drifted = drift > TrackReissueDriftDegrees &&
                        Time.unscaledTime - _segIssueUnscaled >= TrackReissueMinSeconds;
         if (!expired && !drifted)
@@ -752,7 +847,9 @@ internal static class DeadEyeManager
         _segEndpointRot = markRot;
         _segEndUnscaled = Time.unscaledTime + duration; // REAL seconds
         _segIssueUnscaled = Time.unscaledTime;
-        ModLog.Debug($"pursuit glide issued ({remainingDeg:F1}deg over {duration:F2}s real = {remainingDeg / duration:F0}deg/s, drift {drift:F1}deg)");
+        string trigger = expired ? "expired" : $"drift {drift:F1}deg";
+        ModLog.Debug($"pursuit glide issued ({remainingDeg:F1}deg over {duration:F2}s real = " +
+                     $"{remainingDeg / duration:F0}deg/s, {trigger})");
         return remainingDeg;
     }
 

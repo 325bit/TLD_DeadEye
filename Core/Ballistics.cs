@@ -55,11 +55,16 @@ internal static class Ballistics
     /// arrives, plus a gravity-drop offset so the redirected shot lands on the body.
     /// Fixed-point iteration on the flight time (t = distance / launch speed, then lead the
     /// target by velocity * t), 3 iterations — ample for revolver speeds.
+    /// <paramref name="flightTime"/> is in GAME seconds and therefore directly comparable to
+    /// everything else that is scaled; it is reported for the shot diagnostics.
     /// </summary>
     internal static Vector3 PredictIntercept(Vector3 muzzlePos, Vector3 targetPos, Vector3 targetVelocity, float launchSpeed)
+        => PredictIntercept(muzzlePos, targetPos, targetVelocity, launchSpeed, out _);
+
+    internal static Vector3 PredictIntercept(Vector3 muzzlePos, Vector3 targetPos, Vector3 targetVelocity, float launchSpeed, out float flightTime)
     {
         Vector3 predicted = targetPos;
-        float flightTime = 0f;
+        flightTime = 0f;
         for (int i = 0; i < 3; i++)
         {
             flightTime = Vector3.Distance(muzzlePos, predicted) / Mathf.Max(1f, launchSpeed);
