@@ -112,7 +112,7 @@ internal static class DeadEyeManager
 
         // Steer any bullet that is still chasing its mark. Runs in every state: a shot can
         // still be in the air after the sequence has ended.
-        HomingSteering.Tick();
+        HomingSteering.Tick(DeadEyeMod.Settings?.HomingStrength ?? 1f);
 
         // Warm the audio subsystem up during normal gameplay, long before the first
         // activation — the first winmm sound a process issues would otherwise be swallowed.

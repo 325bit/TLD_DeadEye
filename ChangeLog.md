@@ -1,5 +1,11 @@
 # ChangeLog
 
+## 0.6.1
+
+- Stronger, smarter tracking. The bullet used to aim straight at the animal's CURRENT body point, which makes a 300 m/s projectile overshoot and spiral on fast crossing targets — the remaining misses. It now uses LEAD pursuit: the mark's sampled velocity (per scaled second, smoothed, teleport-clamped) times the remaining flight time, so the round flies almost straight at where the animal will be and spends its turn budget on real corrections. Turn ceiling raised 220 -> 520 deg/s.
+- New setting 追踪强度 (HomingStrength, default 1, range 0.5-2.5) scales the turn ceiling: higher pulls harder on fast sideways movement (more visible curve), lower flies straighter.
+- Bullet lifetime 3 -> 8 real seconds: a long shot under the execution slowdown could otherwise stop steering mid-flight.
+
 ## 0.6.0
 
 - **Homing bullets.** With AdaptiveArsenal installed, every projectile fired by the execution sequence now keeps steering toward its marked animal while in flight (new setting 子弹追踪, default on). The Fire prefix registers the projectile's Rigidbody together with that mark's GameObject and body offset; each tick the velocity direction is rotated toward the mark's CURRENT position (up to 220 deg/s, speed preserved), so the lead prediction is only the starting guess and a slightly-off lead still lands. Each bullet keeps its own target — an in-flight round never retargets when the sequence advances to the next mark. Turning runs on scaled time so the bullet behaves correctly under the execution slowdown.
