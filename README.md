@@ -2,7 +2,7 @@
 
 [English](#english) · [中文](#中文)
 
-![version](https://img.shields.io/badge/version-0.7.2-informational)
+![version](https://img.shields.io/badge/version-0.7.4-informational)
 
 ![game](https://img.shields.io/badge/The%20Long%20Dark-2.55-success)
 
@@ -64,10 +64,11 @@ Settings live under **Options → Mod Settings → Dead Eye (死神之眼)**.
 | 子弹追踪 | The execution's bullets keep steering toward the marked animal while in flight (needs AdaptiveArsenal; the vanilla projectile resolves its hit at spawn). Grouse and rabbits are aimed inside the body (depth set by 小体型瞄准点), so the marked part does not matter | On |
 | 追踪强度 | How hard the tracking pulls: 1 is standard; lower flies straighter (0.05 barely curves at all), higher turns harder and holds fast crossing targets | 1 |
 | 小体型瞄准点 | Where the shot goes on grouse and rabbits: 0 = the animal's root (its feet), 1 = exactly what you marked (the body surface), in between = inside the body. Lower values pull the round toward the middle of a body you can barely see; raise it if the shot feels like it passes behind them. Applies immediately, no re-marking | 0.6 |
-| 近失补偿半径 | A shot that passes within this many metres of the marked animal's damage colliders resolves as a hit (0 = exact contact only). Compensates the real bullet diameter and aim tolerance — the round only needs to pass close, not dead-centre. Keep it small: above 0.15 it starts hitting air. Applies immediately | 0.1 |
+| 近失补偿半径 | A shot that passes within this many metres of the marked animal's damage colliders resolves as a hit (0 = exact contact only). Compensates the real bullet diameter and aim tolerance — the round only needs to pass close, not dead-centre. The honest range is 0.1-0.2; above ~0.3 it starts hitting air, and the slider goes to 0.5 only for testing extremes. Applies immediately | 0.1 |
 | 进入 / 退出死神之眼 | Key that starts and ends the mode; click the box and press any key or mouse button to rebind | 鼠标后侧键 |
 | 标记目标 | Key that marks what is under the crosshair; rebindable the same way | 鼠标中键 |
 | 处决时间流速 | World speed during the firing phase (the yellow tint persists, your own fire rate stays normal). Very low values also stretch the game's own weapon state machine, so keep it at 0.4 or above; 1 = no slowdown | 0.8 |
+| 处决射速倍率 | How much faster the execution fires compared to normal shooting: 1 = normal pace (~0.5 s per shot), 2 = ~0.25 s per shot — the closer to RDR2-style Dead Eye rapid fire. Affects the execution sequence only, never normal shooting or reloading | 2 |
 | 进入渐变速度 | How fast time slows when entering; raise for a snappier start | 1 |
 | 退出渐变速度 | How fast time returns to normal when leaving; raise for a snappier exit | 3 |
 | 疲劳每秒消耗 | Fatigue drain while marking, as a percentage of the full bar per real-time second; raise it to pay more | 1 |
@@ -163,10 +164,11 @@ MIT — see [LICENSE](LICENSE).
 | 子弹追踪 | 处决射出的子弹会一路修正方向追着标记目标飞（需要 AdaptiveArsenal；原版弹道在出膛瞬间结算）。松鸡和兔子会被瞄准身体内部（深度由「小体型瞄准点」决定），标哪个部位都一样 | 开 |
 | 追踪强度 | 追踪力度：1 为标准；越低弹道越直（0.05 几乎不打弯），越高转得越急、越能咬住高速横移的目标 | 1 |
 | 小体型瞄准点 | 松鸡、兔子这类小目标朝哪里打：0 = 动物根部（脚下），1 = 你瞄到的那一点（体表），中间值 = 身体内部。调小更靠体内，调大更贴你瞄的表面；立刻生效，不用重新标记 | 0.6 |
-| 近失补偿半径 | 弹道从标记猎物的伤害碰撞体该距离（米）以内擦过时，按命中结算（0 = 仅精确接触才算）。补偿真实弹头直径与瞄准容错——只要求贴近，不要求正中。别调太大：0.15 以上开始打空气。立刻生效 | 0.1 |
+| 近失补偿半径 | 弹道从标记猎物的伤害碰撞体该距离（米）以内擦过时，按命中结算（0 = 仅精确接触才算）。补偿真实弹头直径与瞄准容错——只要求贴近，不要求正中。推荐区间 0.1-0.2；0.3 以上明显在打空气，滑条放到 0.5 仅供测试极端值。立刻生效 | 0.1 |
 | 进入 / 退出死神之眼 | 开启和结束模式的键；点输入框再按任意键或鼠标键可重绑 | 鼠标后侧键 |
 | 标记目标 | 把准星下的目标标记下来的键；重绑方式相同 | 鼠标中键 |
 | 处决时间流速 | 处决期间的世界流速（黄滤镜延续，人物开火保持正常速率）。过低的值会连带拖慢游戏自身的持枪状态机，建议 ≥0.4；1 = 不放慢 | 0.8 |
+| 处决射速倍率 | 处决序列相对平时射击的加速倍率：1 = 平时节奏（约 0.5 秒一发），2 = 约 0.25 秒一发——越接近《荒野大镖客2》的速射感。只影响处决序列，不影响平时射击与换弹 | 2 |
 | 进入渐变速度 | 进入时时间放慢的快慢；调大更干脆 | 1 |
 | 退出渐变速度 | 退出时时间恢复的快慢；调大更干脆 | 3 |
 | 疲劳每秒消耗 | 标记期间每秒（真实时间）消耗疲劳上限的百分比；调大付出更多 | 1 |

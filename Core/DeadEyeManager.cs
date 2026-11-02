@@ -369,11 +369,15 @@ internal static class DeadEyeManager
 
         // Fire-rate gate: the game's own gate lives in scaled seconds (m_NextAllowedFireTime
         // vs Time.time), so under the firing-phase slowdown it would stretch the real
-        // interval by 1/scale. Pace the sequence on UNSCALED time instead: the interval
-        // Fire() pushes onto the gate IS the vanilla real rate (vanilla runs at scale 1),
-        // and the scaled gate is neutralized right before firing. Result: vanilla real
-        // fire rate while the world stays slowed.
-        bool pacingOpen = Time.unscaledTime >= _nextShotUnscaled && !shooter.IsReloadCooldownActive;
+        // interval by 1/scale. Pace the sequence on UNSCALED time instead, compressed by
+        // the owned scale (vanilla real rate) and divided by the rapid-fire multiplier.
+        // The vanilla post-shot cooldown (IsReloadCooldownActive, ~0.5 s) is the pacing
+        // member that actually binds under rapid fire — the measured rate-4 session saw a
+        // 0.52 s median gap with the other members compressed to 0.12 s — so at rate > 1
+        // it is overridden; rate 1 keeps it and restores the vanilla pace exactly.
+        float rate = Mathf.Max(1f, DeadEyeMod.Settings?.FireRateMultiplier ?? 1f);
+        bool pacingOpen = Time.unscaledTime >= _nextShotUnscaled &&
+                          (rate > 1f || !shooter.IsReloadCooldownActive);
 
         // The shot needs the frozen velocity: never fire before the two-sample window has
         // completed for this mark (it always completes long before the pacing opens).
@@ -446,11 +450,13 @@ internal static class DeadEyeManager
         // interval). Left alone under the execution slowdown the game would advance only
         // `scale` seconds per real second, stretching every shot by 1/scale — the "fire
         // rate got slower during the execution" report. Compress the gate by the owned
-        // scale so the REAL wait equals the vanilla interval again.
+        // scale so the REAL wait equals the vanilla interval again, then divide by the
+        // rapid-fire multiplier: gate, unscaled wait and first-person animator
+        // (see PlayerAnimSpeedPatch) must shrink together or the slowest one wins.
         float intervalReal = Mathf.Max(0f, shooter.m_NextAllowedFireTime - Time.time);
         float ts = Mathf.Max(0.001f, TimeScaler.Value);
-        shooter.m_NextAllowedFireTime = Time.time + intervalReal * ts;
-        _nextShotUnscaled = Time.unscaledTime + Mathf.Max(0.05f, intervalReal);
+        shooter.m_NextAllowedFireTime = Time.time + intervalReal * ts / rate;
+        _nextShotUnscaled = Time.unscaledTime + Mathf.Max(0.05f, intervalReal / rate);
         // Diagnostics: the velocity and its source, the flight time it produced, and the two
         // distances that decide a small-prey hit — the lead the shot commits to, and how far
         // the aim point sits from the part the player actually marked. A miss is then one of
@@ -462,7 +468,7 @@ internal static class DeadEyeManager
                     $"v {mark.Velocity.magnitude:F1} m/s [{mark.VelocitySource}], flight {flightTime * 1000f:F0} ms, " +
                     $"lead {(intercept - aimPoint).magnitude:F2} m, aim {(aimPoint - markedPoint).magnitude:F2} m from the mark" +
                     $"{(mark.IsSmallPrey ? $", fraction {AnimalBody.PreyAimFraction:F2}" : string.Empty)}, " +
-                    $"next in {intervalReal:F2}s real)");
+                    $"next in {intervalReal / rate:F2}s real{(rate > 1f ? $" (x{rate:F0})" : string.Empty)})");
         AdvanceTarget("shot fired");
         return true;
     }
@@ -807,10 +813,13 @@ internal static class DeadEyeManager
         if (!expired && !drifted)
             return remainingDeg; // active glide still healthy — let it run
 
-        if (remainingDeg <= ArrivedDeg)
+        if (remainingDeg <= ArrivedDeg * Mathf.Max(1f, DeadEyeMod.Settings?.FireRateMultiplier ?? 1f))
         {
             // Parked on the target already: issuing a 0-degree glide would only burn a
             // dead frame. Just re-arm the endpoint bookkeeping so drift stays meaningful.
+            // Under rapid fire the tolerance widens with the rate (x4 -> 2 deg): the shot
+            // is committed from the intercept, not the view, so a wider park only stops
+            // the 0.03 s micro-glide churn without affecting where the round goes.
             _segEndpointRot = markRot;
             _segEndUnscaled = Time.unscaledTime + TrackReissueMinSeconds;
             _segIssueUnscaled = Time.unscaledTime;

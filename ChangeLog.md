@@ -1,5 +1,15 @@
 # ChangeLog
 
+## 0.7.4
+
+- **Rapid fire now actually fires fast: the vanilla post-shot cooldown is overridden while the multiplier is above 1.** The 0.7.3 session measured a 0.52 s median gap at rate 4 even though the other three pacing members were compressed to 0.12 s — the binder was the fourth member nobody had counted: `vp_FPSShooter.IsReloadCooldownActive`, the game's own ~0.5 s post-shot cooldown, which held `pacingOpen` shut for the whole inter-shot window (the "shot gated" diagnostic never fired because pacing itself never opened). At rate > 1 our own unscaled pacing is authoritative and the cooldown is skipped; rate 1 keeps it, restoring the vanilla pace exactly. The reload-in-progress safety is separate (`animOk`) and unchanged.
+- The camera park tolerance widens with the multiplier (`ArrivedDeg` x rate): under rapid fire the camera stops issuing 0.03 s micro-glide corrections out to 2 deg instead of 0.5 deg. The shot is committed from the intercept, not the view — this only quiets the tracking churn.
+- 近失补偿半径 slider range widened to 0-0.5 for testing extreme values; the description now says where the honest range ends (~0.3).
+
+## 0.7.3
+
+- **RDR2-style rapid fire: new setting 处决射速倍率 (1-4, default 2).** The multiplier is applied to every place the shot pacing lives, and all three must shrink together or whichever is left slowest becomes the actual pace: the vanilla fire-gate compression (`m_NextAllowedFireTime`), the first-person animator compensation (the fire animation itself, via `PlayerAnimSpeedPatch` — at execution scale 0.1 x rate 4 the wanted 40 is capped at the 20x ceiling, trading part of the multiplier for the slowdown compensation), and the manager's own unscaled per-shot wait. 1 = the previous real-time pace; 2 = roughly 0.25 s per shot. Affects the execution sequence only — normal shooting and reloading are untouched.
+
 ## 0.7.2
 
 - **The path test sweeps a tube, not a line.** The 0.7.1 session's misses included rounds that grazed an animal by centimetres and died on the ground behind it (one rabbit passed through the audio volume and landed 0.62 m from the body point). The swept segment is now walked at 0.25 m intervals and every sample is distance-tested against each cached collider (`Collider.ClosestPoint`) — a pass within the new `NearMissRadius` setting (0-0.15 m, default 0.1) resolves as a hit through the same replicated damage pipeline, with the hit point on the collider surface feeding the distance falloff. A cheap bounds pre-filter keeps the per-frame cost negligible, and samples inside a collider still count as exact crossings for the report. The contact path and everything else are unchanged.

@@ -8,8 +8,8 @@ namespace DeadEye.Patches;
 /// `PlayerAnimation.Update` writes the Animator speed itself every frame, so the value set
 /// from the manager tick is overwritten before the Animator is evaluated (live log: at an
 /// execution scale of 0.1 the fire gate stayed closed for 4 s per target and 3 marks
-/// produced 1 shot). A postfix re-applies `1/scale` right after the game's own write.
-/// Clamped at 20x, which covers the whole execution-scale range (0.05-1).
+/// produced 1 shot). A postfix re-applies `1/scale x FireRateMultiplier` right after the
+/// game's own write — the multiplier is the RDR2-style rapid fire. Clamped at 20x.
 /// </summary>
 [HarmonyPatch(typeof(PlayerAnimation), "Update")]
 internal static class PlayerAnimSpeedPatch
@@ -24,10 +24,15 @@ internal static class PlayerAnimSpeedPatch
                 return;
 
             float scale = DeadEye.Core.TimeScaler.Value;
-            if (scale >= 0.99f)
-                return;
+            float rate = Mathf.Max(1f, DeadEyeMod.Settings?.FireRateMultiplier ?? 1f);
+            if (scale >= 0.99f && rate <= 1f)
+                return; // nothing to compensate and no rapid fire: leave the game's own value
 
-            __instance.m_Animator.speed = Mathf.Clamp(1f / scale, 1f, 20f);
+            // The fire animation must play at (vanilla pace x multiplier) regardless of the
+            // owned world slowdown: 1/scale restores the vanilla pace, the multiplier speeds
+            // it past that. At scale 0.1 x rate 4 the wanted 40 is capped at 20, trading part
+            // of the multiplier for the slowdown compensation.
+            __instance.m_Animator.speed = Mathf.Clamp(1f / scale * rate, 1f, 20f);
         }
         catch (System.Exception ex)
         {

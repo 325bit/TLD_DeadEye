@@ -33,8 +33,8 @@ internal class Settings : JsonModSettings
     public float PreyAimFraction = 0.6f;
 
     [Name("近失补偿半径")]
-    [Description("弹道从标记猎物的伤害碰撞体该距离（米）以内擦过时，按命中结算（0 = 仅精确接触才算）。补偿真实弹头直径与瞄准容错——只要求贴近，不要求正中。别调太大：0.15 以上开始打空气。立刻生效。")]
-    [Slider(0f, 0.15f)]
+    [Description("弹道从标记猎物的伤害碰撞体该距离（米）以内擦过时，按命中结算（0 = 仅精确接触才算）。补偿真实弹头直径与瞄准容错——只要求贴近，不要求正中。0.1-0.2 是推荐区间；0.3 以上明显在打空气，滑条放到 0.5 仅供测试极端值。立刻生效。")]
+    [Slider(0f, 0.5f)]
     public float NearMissRadius = 0.1f;
 
     internal const float DefaultNearMissRadius = 0.1f;
@@ -55,6 +55,11 @@ internal class Settings : JsonModSettings
     [Description("按切换键进入处决环节后的时间流速，独立于标记阶段的流速。默认 0.8：世界轻微放慢（黄滤镜延续），人物开火保持正常速率。1 = 不放慢。")]
     [Slider(0.1f, 1f)]
     public float ExecutionTimeScale = 0.8f;
+
+    [Name("处决射速倍率")]
+    [Description("处决序列相对平时射击的加速倍率：1 = 平时节奏（约 0.5 秒一发），2 = 约 0.25 秒一发——越接近《荒野大镖客2》的速射感。只影响处决序列，不影响平时射击与换弹。")]
+    [Slider(1f, 4f)]
+    public float FireRateMultiplier = 2f;
 
     [Name("进入渐变速度")]
     [Description("进入标记模式时时间流速渐变到目标值的快慢，越大越快。")]
