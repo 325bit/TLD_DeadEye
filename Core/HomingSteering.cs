@@ -37,6 +37,7 @@ internal static class HomingSteering
         internal float AimHeight;
         internal bool SmallPrey;
         internal bool Resolved;          // the hit was applied by this mod; the round is torn down
+        internal string ResolutionReason = "resolved on hit"; // report label: hit vs scenery
         internal float CreatedAt;
         internal float ExpiresAt;
         internal bool Aligned;
@@ -58,6 +59,7 @@ internal static class HomingSteering
         internal Vector3 ClosestBodyPoint;
         internal float ClosestSeconds;
         internal bool HitboxCrossed;
+        internal bool HitboxDamageable;
         internal float HitboxSeconds;
         internal int HitboxFrame;
         internal string HitboxDesc = "?";
@@ -106,6 +108,20 @@ internal static class HomingSteering
         {
             ModLog.Debug($"homing: target has no readable BaseAi ({ex.Message})");
             return null;
+        }
+    }
+
+    private static bool IsDead(BaseAi? ai)
+    {
+        if (ai == null)
+            return false;
+        try
+        {
+            return ai.GetAiMode() == AiMode.Dead;
+        }
+        catch (System.Exception)
+        {
+            return false;
         }
     }
 
@@ -185,7 +201,7 @@ internal static class HomingSteering
     /// dead-centre shot as metres wide. Also raycasts that same segment against the animal's
     /// own colliders, which is the only test that says whether the round entered the hitbox.
     /// </summary>
-    private static void TrackClosest(Entry entry, Vector3 bulletPos, Vector3 bodyPoint, float speed,
+    private static bool TrackClosest(Entry entry, Vector3 bulletPos, Vector3 bodyPoint, float speed,
                                      Vector3 bulletVelocity, Vector3 targetVelocity)
     {
         if (entry.SpawnSpeed <= 0f)
@@ -229,7 +245,7 @@ internal static class HomingSteering
             entry.ClosestRoundPos = reached;
             entry.ClosestBodyPoint = bodyPoint;
             entry.ClosestSeconds = Time.unscaledTime - entry.FirstTrackAt;
-            return;
+            return false;
         }
 
         // Geometric pass test, not "the distance grew a little": the round's transform only
@@ -237,7 +253,11 @@ internal static class HomingSteering
         // motion, so a growth threshold trips on the very first frame of every flight and
         // freezes the diagnostic metres short of the target.
         if (entry.Samples > 2 && Vector3.Dot(bodyPoint - bulletPos, bulletVelocity) < 0f)
+        {
             ReportClosest(entry, "passed");
+            return true;
+        }
+        return false;
     }
 
     /// <summary>
@@ -284,9 +304,10 @@ internal static class HomingSteering
                     if (!inside && distance > radius)
                         continue;
 
-                    if (!entry.HitboxCrossed)
+                    if (!entry.HitboxCrossed || (!entry.HitboxDamageable && RoundResolution.IsDamageable(collider)))
                     {
                         entry.HitboxCrossed = true;
+                        entry.HitboxDamageable = RoundResolution.IsDamageable(collider);
                         entry.HitboxSeconds = Time.unscaledTime - entry.FirstTrackAt;
                         entry.HitboxFrame = entry.Samples;
                         entry.HitboxDesc = DescribeHitbox(collider);
@@ -300,10 +321,11 @@ internal static class HomingSteering
                     bool damaged = RoundResolution.ApplyDamage(collider, closest, entry.SpawnPosition,
                                                                weapon, out float damage);
                     RoundResolution.SpawnImpactEffects(collider, closest, sweep.normalized);
+                    entry.ResolutionReason = damaged ? "resolved on hit" : "ended on undamageable body";
                     if (entry.Body != null)
                         UnityEngine.Object.Destroy(entry.Body.gameObject);
-                    ModLog.Info($"homing hit: path test resolved on {collider.gameObject.name} " +
-                                $"{DescribeHitbox(collider)}, " +
+                    ModLog.Info($"{(damaged ? "homing hit: path test resolved on" : "homing round ended on")} " +
+                                $"{collider.gameObject.name} {DescribeHitbox(collider)}, " +
                                 $"{Vector3.Distance(entry.SpawnPosition, closest):F1} m from the muzzle, " +
                                 $"{(damaged ? $"damage {(float.IsPositiveInfinity(damage) ? "critical" : $"{damage:F0}")} applied"
                                             : "no damage (collider not damageable)")}" +
@@ -404,12 +426,12 @@ internal static class HomingSteering
         float aspect = moving && miss.sqrMagnitude > 0.0001f ? Vector3.Angle(velocity, -miss) : 0f;
 
         string hitbox = entry.HitboxCrossed
-            ? $"hitbox crossed at {entry.HitboxSeconds * 1000f:F0} ms (frame {entry.HitboxFrame}): {entry.HitboxDesc}"
+            ? $"hitbox crossed at {entry.HitboxSeconds * 1000f:F0} ms real (frame {entry.HitboxFrame}): {entry.HitboxDesc}"
             : "hitbox never crossed";
         string body = BodyState(entry.Body);
 
         ModLog.Info($"homing pass ({SafeName(entry)}, {(entry.SmallPrey ? "small prey" : "large animal")}, " +
-                    $"{reason}): closest {entry.ClosestDistance:F2} m at {entry.ClosestSeconds * 1000f:F0} ms, " +
+                    $"{reason}): closest {entry.ClosestDistance:F2} m at {entry.ClosestSeconds * 1000f:F0} ms real, " +
                     $"miss ahead {Signed(Vector3.Dot(miss, forward))} right {Signed(Vector3.Dot(miss, right))} " +
                     $"up {Signed(miss.y)}, aspect {aspect:F0} deg, {entry.Samples} frames, {hitbox}, " +
                     $"v {entry.SpawnSpeed:F0} -> {entry.ClosestRoundSpeed:F0} m/s, {body}, " +
@@ -499,8 +521,10 @@ internal static class HomingSteering
                                                            RoundResolution.WeaponSourceOf(entry.Body),
                                                            out float damage);
                 RoundResolution.SpawnImpactEffects(collider, point, forward);
+                entry.ResolutionReason = damaged ? "resolved on hit" : "ended on scenery";
                 UnityEngine.Object.Destroy(entry.Body.gameObject);
-                ModLog.Info($"homing hit: contact resolved on {DescribeHitbox(collider)}, " +
+                ModLog.Info($"{(damaged ? "homing hit: contact resolved on" : "homing round ended on scenery:")} " +
+                            $"{DescribeHitbox(collider)}, " +
                             $"{Vector3.Distance(entry.SpawnPosition, point):F1} m from the muzzle, " +
                             $"{(damaged ? $"damage {(float.IsPositiveInfinity(damage) ? "critical" : $"{damage:F0}")} applied"
                                         : "no damage (collider not damageable)")}");
@@ -533,7 +557,19 @@ internal static class HomingSteering
                 // destroyed, which would otherwise read as the "round gone" miss reason.
                 if (entry.Resolved)
                 {
-                    ReportClosest(entry, "resolved on hit");
+                    ReportClosest(entry, entry.ResolutionReason);
+                    _entries.RemoveAt(i);
+                    continue;
+                }
+
+                // A round whose animal is already dead can still be steered but can no longer
+                // achieve anything, and holding the execution for it means holding it for a
+                // corpse: one measured session held bullet time 5.6 s after the killing shot
+                // while three rounds flew on into a bird that was already down.
+                if (IsDead(entry.Ai))
+                {
+                    ExtrapolateFinal(entry);
+                    ReportClosest(entry, "target dead");
                     _entries.RemoveAt(i);
                     continue;
                 }
@@ -574,7 +610,17 @@ internal static class HomingSteering
                     : root + Vector3.up * entry.AimHeight;
                 Vector3 targetVelocity = VelocityOf(entry, root);
 
-                TrackClosest(entry, bodyPos, bodyPoint, speed, velocity, targetVelocity);
+                bool passed = TrackClosest(entry, bodyPos, bodyPoint, speed, velocity, targetVelocity);
+
+                // A round that has flown past its animal cannot be turned around into it in
+                // any useful time, so it stops being steered AND stops counting toward the
+                // execution hold. Without this the hold ran a full 8 s lifetime on one wasted
+                // round (measured 5.6 s of bullet time after the last hit).
+                if (passed)
+                {
+                    _entries.RemoveAt(i);
+                    continue;
+                }
 
                 // Aim point recomputed NOW rather than replayed from the fire moment: a
                 // snapshot goes stale the instant the animal moves and the round covers

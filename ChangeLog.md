@@ -1,5 +1,14 @@
 # ChangeLog
 
+## 0.7.6
+
+- **The execution hold ends when the last round can no longer achieve anything, not when its lifetime runs out.** The 0.7.5 session held bullet time for **5.6 s after the final hit**: one round of a five-round volley flew past the ptarmigan, reported `passed`, and then kept being steered at it until its own 8 s no-contact expiry — the hold waited on the whole 8 s. A round that has already flown past its animal can never be turned around into it in a useful time, so it now leaves the count (and steering) the moment it passes.
+- **Rounds aimed at an animal that is already dead stop counting too.** In the same session the killing shot landed at 21.420 and three rounds still in the air continued into the corpse for another 1.3 s of bullet time, each applying 595 damage to something that was already down. A round whose target is dead is dropped from the count on the next tick.
+- **"Resolved on hit" no longer covers scenery.** 3 of the 16 "hits" in that session were `contact resolved on MountainTown_main_terrain ... no damage (collider not damageable)` — rounds that missed the animal and hit the ground — and they were counted and labelled as hits in the pass report. Contacts with a non-damageable collider now log `homing round ended on scenery` and report `ended on scenery`; the path test's equivalent case reports `ended on undamageable body`.
+- The hitbox description now prefers the **damageable** collider when a round crosses several: the first one hit is usually the animal's `Audio_Wildlife*` trigger (layer 22, no `LocalizedDamage`), which made every crossing read as a harmless volume.
+- Times in the pass report are labelled `ms real` — they are real seconds, which under a 0.2 execution scale is several times the game-time flight the shot line prints.
+- Session results (00:38-00:48, 19 sequences, 55 shots): with homing **on** 16 of 17 rounds resolved as hits and 13 of those applied damage (76 %); with homing **off** 38 shots produced 14 animal contacts (37 %). The hold fired in all 7 homing sequences and lasted 0.67-1.91 s except the 6.88 s case above.
+
 ## 0.7.5
 
 - **The execution's slow motion now holds until the LAST bullet is consumed.** Previously the time scale started restoring the moment the last shot fired — the round was still in the air while the world snapped back. The firing state (execution scale, yellow tint, in-flight steering) is now held after the sequence fires until HomingSteering reports no live rounds: a round leaves the count when it is consumed by the marked animal, by scenery, or by its own 8 s no-contact expiry, and each of those ends the hold. Without live rounds (vanilla bullet path, homing off) the sequence ends immediately as before; the hold is capped one second past the rounds' own expiry, is reset by every exit path (force exit, scene change, new sequence), and the on-screen message shows 死神之眼：最后一发 while waiting.
