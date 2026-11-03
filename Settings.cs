@@ -41,17 +41,17 @@ internal class Settings : JsonModSettings
     public float PreyAimFraction = 0.7f;
 
     [Name("近失补偿半径")]
-    [Description("弹道从标记猎物的伤害碰撞体该距离（米）以内擦过时，按命中结算（0 = 仅精确接触才算）。补偿真实弹头直径与瞄准容错——只要求贴近，不要求正中。0.1-0.2 偏保守，0.5 = 当前调校值；越大越容易把擦身而过算成命中。立刻生效。")]
-    [Slider(0f, 0.5f)]
-    public float NearMissRadius = 0.5f;
+    [Description("弹道从标记猎物的伤害碰撞体该距离（米）以内擦过时，按命中结算（0 = 仅精确接触才算）。补偿真实弹头直径与瞄准容错——只要求贴近，不要求正中。0.1-0.2 偏保守，0.6 = 当前调校值；越大越容易把擦身而过算成命中。立刻生效。")]
+    [Slider(0f, 1.0f)]
+    public float NearMissRadius = DefaultNearMissRadius;
 #else
     internal bool HomingBullets = true;
     internal float HomingStrength = 0.5f;
     internal float PreyAimFraction = 0.7f;
-    internal float NearMissRadius = 0.5f;
+    internal float NearMissRadius = DefaultNearMissRadius;
 #endif
 
-    internal const float DefaultNearMissRadius = 0.5f;
+    internal const float DefaultNearMissRadius = 0.6f;
 
     [Section("按键")]
 
@@ -125,14 +125,14 @@ internal class Settings : JsonModSettings
     [Name("刮屏白带宽度")]
     [Description("启动死神之眼时扫过的白色光斑宽度，以屏幕宽度的比例表示。0.30 = 当前调校值。调整后立刻生效。")]
     [Slider(0.10f, 1.50f)]
-    public float ScratchBlobWidth = 1.5f;
+    public float ScratchBlobWidth = 1.0f;
 
     [Name("刮屏扫过时长")]
     [Description("白色光斑从一侧扫到另一侧所花的时间（秒），越小越快。0.6 = 当前调校值。调整后立刻生效。")]
     [Slider(0.10f, 1.50f)]
     public float ScratchDuration = 0.3f;
 #else
-    internal float ScratchBlobWidth = 1.5f;
+    internal float ScratchBlobWidth = 1.0f;
     internal float ScratchDuration = 0.3f;
 #endif
     [Section("音效")]

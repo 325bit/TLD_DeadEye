@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
 
@@ -296,6 +297,7 @@ internal static class AdaptiveProjectileRedirectPatch
 {
     private static bool _engagedLogged;
 
+
     internal static void Prefix(object __instance)
     {
         try
@@ -415,3 +417,133 @@ internal static class AnimIntWritePatch
     }
 }
 
+/// <summary>
+/// Silent mirror of the game's input-context stack: every panel's Enable pops the gameplay
+/// context ('WorldView') and the panel's close path is supposed to push it back. The mirror
+/// records that ownership without logging anything; <see cref="WorldViewContextRestore"/>
+/// uses it to tell "a panel owns input" from "the stack is empty and input is still refused".
+/// </summary>
+internal static class ContextStackMirror
+{
+    private static readonly List<string> _stack = new();
+
+    internal static bool IsEmpty => _stack.Count == 0;
+
+    internal static void Push(MonoBehaviour context)
+    {
+        try { _stack.Add(context != null ? context.gameObject.name : "null"); }
+        catch { }
+    }
+
+    internal static void Pop(MonoBehaviour context)
+    {
+        try { if (_stack.Count > 0) _stack.RemoveAt(_stack.Count - 1); }
+        catch { }
+    }
+}
+
+[HarmonyPatch(typeof(InputManager), nameof(InputManager.PushContext))]
+internal static class PushContextMirrorPatch
+{
+    private static void Prefix(MonoBehaviour __0) => ContextStackMirror.Push(__0);
+}
+
+[HarmonyPatch(typeof(InputManager), nameof(InputManager.PopContext))]
+internal static class PopContextMirrorPatch
+{
+    private static void Prefix(MonoBehaviour __0) => ContextStackMirror.Pop(__0);
+}
+
+/// <summary>
+/// Restores a lost gameplay input context. The game's input readers are gated by
+/// HasContext, which refuses while (a) the static m_InputDisableTime is ahead of Time.time —
+/// a 0.06 s window InputManager.PopContext sets on every panel close — or (b) the caller's
+/// context is absent from the static m_InputContexts list. Every Panel_*.Enable pops the
+/// gameplay context ('WorldView') and the panel's close path is supposed to push it back;
+/// that close path can be interrupted while Dead Eye owns the time scale, and because the
+/// list is STATIC it survives scene loads, so later sessions can start with the gameplay
+/// context missing: reload, aim and every other gated reader refuse silently while fire
+/// (ungated) keeps working. This postfix watches the game's own continuous
+/// HasContext('WorldView') polling; when the refusal — membership, with the 0.06 s time gate
+/// clear — persists over 1 s while Dead Eye is fully inactive, the HUD is up and no panel
+/// owns input, the CURRENT WorldView instance is re-pushed with the game's own API, once
+/// per episode.
+/// </summary>
+[HarmonyPatch]
+internal static class WorldViewContextRestore
+{
+    private static readonly Dictionary<int, string> _names = new();
+    private static float _firstFalseReal = -1f;
+    private static float _nextLog;
+    private static float _nextRestore;
+    private static int RestoreCount;
+
+    private static System.Reflection.MethodBase TargetMethod()
+    {
+        foreach (var m in AccessTools.GetDeclaredMethods(typeof(InputManager)))
+            if (m.Name == "HasContext" && m.GetParameters().Length == 1)
+                return m;
+        foreach (var m in AccessTools.GetDeclaredMethods(typeof(InputManager)))
+            if (m.Name == "HasContext")
+                return m;
+        return AccessTools.Method(typeof(InputManager), nameof(InputManager.Process));
+    }
+
+    private static void Postfix(MonoBehaviour __0, bool __result)
+    {
+        try
+        {
+            if (__result)
+            {
+                _firstFalseReal = -1f;
+                return;
+            }
+
+            int id = 0;
+            try { id = __0 != null ? __0.GetInstanceID() : 0; } catch { }
+            if (id == 0)
+                return;
+            if (!_names.TryGetValue(id, out string? name))
+            {
+                try { name = __0.gameObject.name ?? "null"; }
+                catch { name = "destroyed"; }
+                _names[id] = name;
+            }
+            name ??= "null";
+
+            if (name != "WorldView")
+                return;
+
+            float disableTime;
+            try { disableTime = InputManager.m_InputDisableTime; }
+            catch { return; }
+            if (disableTime > Time.time)
+            {
+                _firstFalseReal = -1f; // the 0.06 s pop window: legitimate, self-clearing
+                return;
+            }
+
+            float now = Time.unscaledTime;
+            if (_firstFalseReal < 0f)
+                _firstFalseReal = now;
+
+            if (DeadEye.Core.DeadEyeManager.State == DeadEye.Core.DeadEyeState.Inactive &&
+                DeadEye.Core.DeadEyeManager.IsGameplayActive() &&
+                ContextStackMirror.IsEmpty &&
+                now - _firstFalseReal > 1f &&
+                now >= _nextRestore)
+            {
+                _nextRestore = now + 10f;
+                RestoreCount++;
+                InputManager.PushContext(__0);
+                ModLog.Warn($"input context restored: WorldView was missing from the static list — " +
+                            $"PushContext issued (restore #{RestoreCount}); reload and every gated " +
+                            $"reader should recover immediately");
+            }
+        }
+        catch
+        {
+            // a destroyed context argument must not break the game's input path
+        }
+    }
+}

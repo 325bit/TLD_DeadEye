@@ -230,6 +230,9 @@ internal static class DeadEyeManager
             TimeScaler.ForceRestore();
             ModAudio.Stop(); // the activation sound ends with the mode
             State = DeadEyeState.Inactive;
+            // 0.7.39: anchors the state timeline — the ghost-shot window after a cancel-then-
+            // fire can only be attributed to a stuck state if the log shows where Inactive began.
+            ModLog.Info("Dead Eye inactive (exit complete)");
         }
     }
 
@@ -812,6 +815,10 @@ internal static class DeadEyeManager
             if (!AnimalBody.TryResolveMarkPoint(ai, hit.collider, ray, out Vector3 markPoint,
                                                 out float miss, out float tolerance, out string source))
             {
+                // Second failure shape: the ray DID hit the animal but no damageable collider
+                // resolved. Log the full collider inventory (0.7.38) before degrading — absent
+                // vs disabled capsules are different games, and vanilla bullets care too.
+                MarkForensics.LogNoDamageable(ai, hit.collider, hit);
                 ModLog.Warn($"mark: nothing damageable resolved on {hit.collider.gameObject.name} " +
                             $"({HomingSteering.DescribeHitbox(hit.collider)}) — using the raw hit point");
                 markPoint = hit.point;
@@ -852,6 +859,10 @@ internal static class DeadEyeManager
             return;
         }
 
+        // Log-only forensics at Warning: the failure shape (zero raw hits vs skipped aux
+        // volumes vs a visible animal off-ray) decides the fix, and without evidence every
+        // report looks the same. See Core/MarkForensics.cs.
+        MarkForensics.LogMiss(ray, hits);
         Overlay.SetMessage("准星处没有活物（射线没碰到动物）", 1.2f);
     }
 

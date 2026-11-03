@@ -258,8 +258,9 @@ internal static class AnimalBody
     /// Colliders of ONE animal. The whole transform root is preferred, because a prefab can
     /// hang its damage capsules outside the object that carries `BaseAi` — but only when that
     /// root holds exactly one animal, since a shared holder would otherwise mix flocks together.
+    /// internal so the failure forensics can re-collect the same set and report what was skipped.
     /// </summary>
-    private static Collider[]? CollectFor(BaseAi ai, Collider hitCollider)
+    internal static Collider[]? CollectFor(BaseAi ai, Collider hitCollider)
     {
         try
         {
@@ -323,7 +324,7 @@ internal static class AnimalBody
     /// <paramref name="cache"/> is filled once and reused by callers that run per frame;
     /// a cache that yields nothing is dropped so the next call re-collects.
     /// </summary>
-    private static bool TryGetBodyBounds(GameObject? root, ref Collider[]? cache, out Bounds bounds)
+    internal static bool TryGetBodyBounds(GameObject? root, ref Collider[]? cache, out Bounds bounds)
     {
         bounds = default;
         if (root == null)
