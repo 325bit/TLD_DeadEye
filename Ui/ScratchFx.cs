@@ -22,6 +22,7 @@ internal static class ScratchFx
     private const float DurationSeconds = 0.6f;
     private const float SweepWidthFraction = 0.55f;   // strip width as a fraction of screen width
     private const float TintSoftEdgeFraction = 0.18f; // soft tint boundary around the head
+    private const float HeadLead = 0.25f;             // strip fraction reserved for the forward glow past the head
     private const int TexW = 256;
     private const int TexH = 128;
 
@@ -140,10 +141,12 @@ internal static class ScratchFx
     }
 
     /// <summary>
-    /// The strip texture: x = tail (0) to head (1). Alpha = a vertical Gaussian hugging the
-    /// lower-middle of the frame times [a hot round head cloud + a feathery tail] — the
-    /// tail is column-streaked with torn gaps and grain, the head line wavy per row, which
-    /// is what reads as "scratch" instead of a clean gradient.
+    /// The strip texture: x = tail (0) to head centre (1-HeadLead) to forward-glow edge (1).
+    /// Alpha = a vertical Gaussian hugging the lower-middle of the frame times [a hot round
+    /// head cloud + a feathery tail] — the tail is row-streaked with torn gaps and grain,
+    /// the head line wavy per row, which is what reads as "scratch" instead of a clean
+    /// gradient. The head cloud's Gaussian straddles its centre, so the streak keeps
+    /// glowing a little way AHEAD of the head line and fades out there — no hard cut.
     /// </summary>
     private static void BuildStrip()
     {
@@ -210,10 +213,11 @@ internal static class ScratchFx
             float rowShift = shift[y];
             for (int x = 0; x < TexW; x++)
             {
-                float t = Mathf.Clamp01((x + rowShift) / (TexW - 1f)); // 0 tail, 1 head
-                float tail = Mathf.Pow(t, 1.8f) * 0.45f;
-                float dx = (t - 1f) / 0.10f;
-                float blob = Mathf.Exp(-dx * dx); // hot round head cloud
+                float t = Mathf.Clamp01((x + rowShift) / (TexW - 1f)); // 0 tail -> 1 glow edge
+                float tt = Mathf.Clamp01(t / (1f - HeadLead));         // 0 tail -> 1 at the blob centre
+                float tail = Mathf.Pow(tt, 1.8f) * 0.45f;
+                float dx = (t - (1f - HeadLead)) / 0.07f;
+                float blob = Mathf.Exp(-dx * dx); // hot round head cloud, glowing forward too
                 float grain = 0.72f + 0.28f * UnityEngine.Random.value;
                 float a = vmask * Mathf.Clamp01(blob + tail * streak[y] * grain);
                 px[row + x] = new Color32(255, 255, 255, (byte)(a * 255f));

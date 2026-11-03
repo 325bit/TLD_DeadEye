@@ -1,5 +1,9 @@
 # ChangeLog
 
+## 0.7.31
+
+- **Fixed: the streak's leading edge was a hard vertical line.** The head cloud's Gaussian was centred on the texture's edge, so the brightest point of the streak had full alpha on one side and NOTHING on the other — wherever the head line was, the white glow simply stopped (the 0.7.30 capture shows it at ~97% screen width). The strip now reserves its last 25% for the forward glow: the blob centre sits at 75% and decays past the head line in the travel direction, so the head radiates forward like a light bloom and fades out with no cut. Rect placement updated for both directions (head centre stays pinned to headX).
+
 ## 0.7.30
 
 - **Fixed: the hard tint edge after the scratch head left the screen** (both user reports from the 17-40-33 capture). Root cause found by pixel-measuring the recording: the solid tint rect was `[headX, headX+W]` unclamped — once headX went negative (right-to-left sweeps, last third of the motion) its right end fell INSIDE the screen, exposing an untinted region behind a perfectly straight edge that swept leftward ("a part of the screen reverts to the real look, then the full yellow arrives"), while the gradient rode off-screen with the head, unable to soften it. The rect is now intersected with the screen bounds, so the tint always covers everything the head has crossed, all the way to the sweep's end — the canvas handoff is seamless.
