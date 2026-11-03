@@ -1,5 +1,11 @@
 # ChangeLog
 
+## 0.7.34
+
+- **The scratch is now a static veil + a sweeping glow, by design.** Pixel measurement of the 0.7.32 capture proved the remaining "straight line" was not a seam but the tail haze's VISIBILITY ONSET: the tail alpha ramps from zero, white-over-bright-scene becomes perceptible at alpha ≈ 0.045, and the point where the ramp crosses that threshold travels with the strip as a coherent, leaning line — a perceptual edge no envelope curve can remove, because removing the ramp's steepness just moves the line.
+- Solution, mirroring how the tint already works: the white haze is now a full-screen fibrous VEIL that appears the moment the mode starts (no spatial alpha ramp — the onset line cannot exist by construction) and fades out globally over the second half of the sweep (a whole-screen fade reads as fog lifting, never as a boundary). The only moving element left is the bright head GLOW, a soft blob that fades both ways from its centre, sweeping across the veil with the random tilt. Row wisps widened to 0.2-1.0 with 20% tears so both layers read as discrete fibres.
+- Trade-off: the haze no longer appears to be dragged behind the scratch — the look is "fog rolls in, one light sweeps across it, fog lifts".
+
 ## 0.7.33
 
 - **The tint no longer rides with the scratch — full yellow from the first frame again.** The split-tint experiment (0.7.27-0.7.30: drawing the tint in OnGUI split at the scratch head, canvas suppressed until the sweep ends) produced every hard-line artifact we chased: the unclipped-rect revert region, the rect-end clip line, and finally a 1 px float seam between the solid and gradient rects that showed as a thin coloured line over the scene (0.7.30 capture). The seam class cannot be fully trusted away while two translucent rects must tile edge-to-edge every frame, so the whole path is removed: the canvas overlay goes full yellow the moment the mode starts (as before 0.7.27) and the white scratch — which has no hard edges since 0.7.31 — sweeps over it. Trade-off by choice: the tone boundary no longer follows the head, but no tint seam can exist at all.

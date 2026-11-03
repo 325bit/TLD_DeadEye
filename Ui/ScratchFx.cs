@@ -3,33 +3,33 @@ using UnityEngine;
 namespace DeadEye.Core;
 
 /// <summary>
-/// RDR2-style white scratch wipe on Dead Eye activation, modelled on the reference clip
-/// (10.65-10.92 s): a cloud-like bright head with a long feathery tail hugging the
-/// lower-middle of the screen, sweeping across in ~0.6 s (unscaled, near-linear motion)
-/// from a random side, with a small random lean.
-/// The yellow tint is NOT split at the head any more (0.7.27-0.7.30 tried that and every
-/// hard-line artifact we chased — unclipped rect edges, the rect-end clip line, a 1 px
-/// float seam between the solid and gradient rects — lived in exactly that code path).
-/// The canvas overlay goes full yellow the moment the mode starts (vanilla behaviour) and
-/// the white scratch sweeps OVER it: one texture, one DrawTexture call, no seams by
-/// construction.
-/// Drawn in OnGUI from one procedurally generated RGBA strip (regenerated per activation:
-/// row streaks, torn gaps, grain, wavy head line) mirrored at draw time for R2L.
+/// RDR2-style white scratch on Dead Eye activation — veil variant. Two layers:
+/// 1. A full-screen fibrous white VEIL that appears the moment the mode starts (same frame
+///    as the yellow tint) and fades out globally over the second half of the sweep. Its
+///    alpha has NO spatial gradient, so there is no moving visibility boundary — the
+///    "onset line" class of artifact (0.7.27-0.7.32) cannot exist by construction.
+/// 2. The bright head GLOW: a soft round-edged blob (forward and backward Gaussian, plus
+///    the vertical lower-middle mask) that sweeps across the veil in ~0.6 s unscaled from a
+///    random side, with a small random lean. This is the only moving element; every edge
+///    of it is a Gaussian.
+/// Both layers are procedural RGBA textures drawn in OnGUI (one DrawTexture each).
 /// Purely cosmetic: no game objects, shaders, cameras or post-processing are touched, and
 /// the sweep self-terminates — it finishes even if the mode is cancelled mid-reveal.
 /// </summary>
 internal static class ScratchFx
 {
     private const float DurationSeconds = 0.6f;
-    private const float SweepWidthFraction = 0.55f;   // strip width as a fraction of screen width
-    private const float HeadLead = 0.25f;             // strip fraction reserved for the forward glow past the head
+    private const float VeilAlpha = 0.13f;        // peak opacity of the static fibrous veil
+    private const float VeilFadeStart = 0.45f;    // sweep progress where the veil starts fading
+    private const float BlobWidthFraction = 0.30f; // blob rect width as a fraction of screen width
     private const int TexW = 256;
     private const int TexH = 128;
 
-    private static Texture2D? _strip; // white streak: tail (x=0) -> head (x=1)
+    private static Texture2D? _veil; // full-screen fibrous fog, no spatial alpha ramp
+    private static Texture2D? _blob; // the sweeping head glow: tail (0) -> centre (0.5) -> glow (1)
     private static float _start = -1f;
     private static bool _fromLeft;
-    private static float _tilt; // small random lean of the whole streak, degrees
+    private static float _tilt; // small random lean of the sweeping blob, degrees
 
     /// <summary>Arm one sweep. Called when the mode actually enters (not on refused tries).</summary>
     internal static void Trigger()
@@ -37,13 +37,14 @@ internal static class ScratchFx
         _start = Time.unscaledTime;
         _fromLeft = UnityEngine.Random.value < 0.5f;
         _tilt = UnityEngine.Random.Range(3.5f, 8f) * (UnityEngine.Random.value < 0.5f ? -1f : 1f);
-        BuildStrip();
+        BuildVeil();
+        BuildBlob();
     }
 
     /// <summary>Called from OnGUI every event; draws nothing unless a sweep is running.</summary>
     internal static void Draw()
     {
-        if (_start < 0f || _strip == null)
+        if (_start < 0f || _veil == null || _blob == null)
             return;
 
         float p = (Time.unscaledTime - _start) / DurationSeconds;
@@ -53,113 +54,140 @@ internal static class ScratchFx
             return;
         }
 
-        float w = Screen.width * SweepWidthFraction;
-
-        // Near-linear head motion with a soft landing (the reference reads as constant
-        // speed): strong easing made the bright head cross in ~0.12 s, half the reference.
-        float eased = 1f - Mathf.Pow(1f - p, 1.2f);
-        float head = Mathf.Lerp(0f, Screen.width + w, eased); // head position in travel direction
-        float headX = _fromLeft ? head : Screen.width - head; // head position in SCREEN space
-
-        DrawStreak(headX, w, p);
+        DrawVeil(p);
+        DrawBlob(p);
     }
 
-    /// <summary>The white comet: texture-authored tail->head, mirrored for R2L.</summary>
-    private static void DrawStreak(float headX, float w, float progress)
+    /// <summary>
+    /// Static fibrous veil: full-screen from the first frame, fading out GLOBALLY over the
+    /// last part of the sweep. A whole-screen alpha fade reads as the fog lifting — never
+    /// as a boundary, because every pixel dims by the same amount on the same frame.
+    /// </summary>
+    private static void DrawVeil(float p)
     {
-        // Pin the BLOB CENTRE (texture x = 1-HeadLead, the brightest point) to headX, not
-        // the texture edge: the strip carries the forward glow past the head line, so the
-        // bright core never ends in a hard vertical cut.
-        //   L2R: blob at rect.x + 0.75w  -> rect starts at headX - 0.75w.
-        //   R2L: mirrored in place, blob at rect.x + 0.25w -> rect starts at headX - 0.25w.
-        float x = headX - (_fromLeft ? 1f - HeadLead : HeadLead) * w;
+        float fade = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((p - VeilFadeStart) / (1f - VeilFadeStart)));
+        GUI.color = new Color(1f, 1f, 1f, VeilAlpha * fade);
+        GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), _veil, ScaleMode.StretchToFill, true);
+        GUI.color = Color.white;
+    }
 
-        // Tilted draw: rotate the whole strip by the small random lean around the head
-        // point. The strip is oversized vertically (1.35x) so its tips still reach past
-        // the screen's top/bottom edges after the rotation.
+    /// <summary>The sweeping head glow: texture-authored glow edge->centre->glow edge, mirrored for R2L.</summary>
+    private static void DrawBlob(float p)
+    {
+        float w = Screen.width * BlobWidthFraction;
+
+        // Near-linear motion with a soft landing (the reference reads as constant speed).
+        float eased = 1f - Mathf.Pow(1f - p, 1.2f);
+        float centre = Mathf.Lerp(-w / 2f, Screen.width + w / 2f, eased); // blob centre, screen space
+
+        // Tilted draw: rotate by the small random lean around the blob centre. The rect is
+        // oversized vertically (1.35x) so its tips still reach past the screen's top/bottom
+        // edges after the rotation.
         float h = Screen.height * 1.35f;
-        var rect = new Rect(x, (Screen.height - h) / 2f, w, h);
+        var rect = new Rect(centre - w / 2f, (Screen.height - h) / 2f, w, h);
 
-        // The tail thins out while the head is still travelling: in the reference the
-        // wisps behind the head dissipate instead of hanging as a full-screen haze.
         Matrix4x4 saved = GUI.matrix;
-        GUI.color = new Color(1f, 1f, 1f, 1f - 0.4f * progress);
-        var pivot = new Vector2(headX, Screen.height / 2f);
+        GUI.color = new Color(1f, 1f, 1f, 1f - 0.4f * p);
+        var pivot = new Vector2(centre, Screen.height / 2f);
         GUIUtility.RotateAroundPivot(_tilt, pivot);
         if (!_fromLeft)
         {
             // The texture is authored left-tail -> right-head; mirror the draw for R2L.
             GUIUtility.ScaleAroundPivot(new Vector2(-1f, 1f), pivot);
         }
-        GUI.DrawTexture(rect, _strip, ScaleMode.StretchToFill, true);
+        GUI.DrawTexture(rect, _blob, ScaleMode.StretchToFill, true);
         GUI.matrix = saved;
         GUI.color = Color.white;
     }
 
-    /// <summary>
-    /// The strip texture: x = tail (0) to head centre (1-HeadLead) to forward-glow edge (1).
-    /// Alpha = a vertical Gaussian hugging the lower-middle of the frame times [a hot round
-    /// head cloud + a feathery tail] — the tail is row-streaked with torn gaps and grain,
-    /// the head line wavy per row, which is what reads as "scratch" instead of a clean
-    /// gradient. The head cloud's Gaussian straddles its centre, so the streak keeps
-    /// glowing a little way AHEAD of the head line and fades out there — no hard cut.
-    /// </summary>
-    private static void BuildStrip()
+    private static Texture2D NewTex()
     {
-        if (_strip == null)
+        return new Texture2D(TexW, TexH, TextureFormat.RGBA32, false, true)
         {
-            _strip = new Texture2D(TexW, TexH, TextureFormat.RGBA32, false, true)
-            {
-                wrapMode = TextureWrapMode.Clamp,
-                filterMode = FilterMode.Bilinear,
-            };
-        }
+            wrapMode = TextureWrapMode.Clamp,
+            filterMode = FilterMode.Bilinear,
+        };
+    }
 
-        // Per-ROW streak strength with occasional near-gaps (the "tears"): the strip is
-        // stretched to full screen height, so row-wise variation renders as the long
-        // HORIZONTAL wisps the reference tail is made of — column-wise variation turned
-        // into vertical blinds instead (0.7.27 test capture).
+    /// <summary>
+    /// Shared row-wisp field: per-row strength in a WIDE range with frequent tears, so the
+    /// fog reads as discrete horizontal fibres with the world showing through between them
+    /// (the narrow 0.55-1.0 range of 0.7.32 made the veil a coherent wall).
+    /// </summary>
+    private static float[] BuildRowWisps()
+    {
         var streak = new float[TexH];
         for (int y = 0; y < TexH; y++)
         {
-            float s = 0.55f + 0.45f * UnityEngine.Random.value;
-            if (UnityEngine.Random.value < 0.10f)
-                s *= 0.35f;
+            float s = 0.20f + 0.80f * UnityEngine.Random.value;
+            if (UnityEngine.Random.value < 0.20f)
+                s *= 0.30f;
             streak[y] = s;
         }
+        return streak;
+    }
 
-        // Per-row head offset: the tear line is wavy, not a straight vertical edge.
-        var shift = new float[TexH];
-        float phase = UnityEngine.Random.value * Mathf.PI * 2f;
-        for (int y = 0; y < TexH; y++)
-            shift[y] = (UnityEngine.Random.value - 0.5f) * TexW * 0.05f
-                       + Mathf.Sin(y / (float)TexH * Mathf.PI * 2f + phase) * TexW * 0.03f;
+    /// <summary>
+    /// The veil: uniform along x (no spatial alpha ramp — that is the whole point), fibrous
+    /// along y, with a gentle lower-middle emphasis so it does not read as a flat grey plate.
+    /// </summary>
+    private static void BuildVeil()
+    {
+        if (_veil == null)
+            _veil = NewTex();
 
+        var streak = BuildRowWisps();
         var px = new Color32[TexW * TexH];
         for (int y = 0; y < TexH; y++)
         {
-            // Vertical mask: bright in the lower-middle band (like the reference), faint
-            // elsewhere. The low floor keeps it from reading as a vertical light pillar.
+            float v = y / (TexH - 1f);
+            float dv = (v - 0.62f) / 0.32f;
+            float vmask = 0.55f + 0.45f * Mathf.Exp(-dv * dv);
+
+            int row = y * TexW;
+            for (int x = 0; x < TexW; x++)
+            {
+                float grain = 0.80f + 0.20f * UnityEngine.Random.value;
+                float a = vmask * streak[y] * grain;
+                px[row + x] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(a) * 255f));
+            }
+        }
+
+        _veil.SetPixels32(px);
+        _veil.Apply(false);
+    }
+
+    /// <summary>
+    /// The sweeping glow: a round-edged blob centred in the strip (Gaussian along x, so it
+    /// fades out BOTH ways from the centre — no leading or trailing cut), weighted by the
+    /// lower-middle vertical mask and light row fibres.
+    /// </summary>
+    private static void BuildBlob()
+    {
+        if (_blob == null)
+            _blob = NewTex();
+
+        var streak = BuildRowWisps();
+        var px = new Color32[TexW * TexH];
+        for (int y = 0; y < TexH; y++)
+        {
             float v = y / (TexH - 1f);
             float dv = (v - 0.62f) / 0.30f;
             float vmask = 0.15f + 0.85f * Mathf.Exp(-dv * dv);
 
             int row = y * TexW;
-            float rowShift = shift[y];
             for (int x = 0; x < TexW; x++)
             {
-                float t = Mathf.Clamp01((x + rowShift) / (TexW - 1f)); // 0 tail -> 1 glow edge
-                float tt = Mathf.Clamp01(t / (1f - HeadLead));         // 0 tail -> 1 at the blob centre
-                float tail = Mathf.Pow(tt, 1.8f) * 0.45f;
-                float dx = (t - (1f - HeadLead)) / 0.12f;
-                float blob = Mathf.Exp(-dx * dx); // hot round head cloud, glowing forward too
+                float t = x / (TexW - 1f);
+                float dx = (t - 0.5f) / 0.22f;
+                float blob = Mathf.Exp(-dx * dx); // fades BOTH ways from the centre
                 float grain = 0.72f + 0.28f * UnityEngine.Random.value;
-                float a = vmask * Mathf.Clamp01(blob + tail * streak[y] * grain);
-                px[row + x] = new Color32(255, 255, 255, (byte)(a * 255f));
+                float a = vmask * Mathf.Clamp01(blob + 0.25f * blob * streak[y] * grain);
+                px[row + x] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(a) * 255f));
             }
         }
 
-        _strip.SetPixels32(px);
-        _strip.Apply(false);
+        _blob.SetPixels32(px);
+        _blob.Apply(false);
     }
 }
