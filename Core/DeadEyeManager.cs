@@ -605,6 +605,7 @@ internal static class DeadEyeManager
                           settings.EnterLerpSpeed);
         Overlay.SetOverlay(settings.YellowOverlay && settings.OverlayOpacity > 0f);
         State = DeadEyeState.Marking;
+        ScratchFx.Trigger(); // RDR2-style white scratch wipe across the screen
         ModLog.Info($"Dead Eye entered: cap={MarkCap}, bound={GunResolver.BoundGearName}, draw={_awaitingDraw}, fatigue norm={fatigueNow?.GetNormalizedFatigue():F3}");
         Overlay.SetMessage($"死神之眼 · 标记目标（0/{MarkCap}）", 2.5f);
         ModAudio.PlayEnter();

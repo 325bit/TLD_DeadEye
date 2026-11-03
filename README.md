@@ -2,7 +2,7 @@
 
 [English](#english) · [中文](#中文)
 
-![version](https://img.shields.io/badge/version-0.7.25-informational)
+![version](https://img.shields.io/badge/version-0.7.26-informational)
 
 ![game](https://img.shields.io/badge/The%20Long%20Dark-2.55-success)
 
@@ -21,6 +21,7 @@ A The Long Dark mod that slows the world down, lets you mark animals like RDR2's
 **Bullet time**
 
 - Press the side mouse button while carrying a revolver — the revolver is drawn if it was stowed (the raise plays out in slow motion), time slows to a tenth speed for 0.7 s (the draw reveal), the screen tints yellow and the signature activation sound plays, like Dead Eye in Red Dead Redemption 2. When the reveal ends the world drops to the fixed deeper marking speed (0.01x), so the rest of the raise crawls through the whole marking phase.
+- Entering the mode also plays the RDR2-style white scratch wipe: a bright, feathery white streak sweeps horizontally across the whole screen in about half a second, starting from a random side, while the yellow tint settles. Purely cosmetic (one procedurally generated texture drawn in the HUD layer), and it finishes sweeping even if the mode is cancelled immediately.
 - While marking, a short background loop keeps playing once the activation sting finishes, and stops the moment marking ends — the execution starting, the cancel key, running out of fatigue, any exit.
 - Press the middle mouse button while looking at a live animal — a red mark appears over it and stays attached to the animal even while it moves, with a short sound confirming the mark.
 - You can mark the same animal several times or several animals in any order — the number of marks never exceeds the rounds left in the revolver's cylinder.
@@ -134,6 +135,7 @@ MIT — see [LICENSE](LICENSE).
 **子弹时间**
 
 - 携带左轮时按下鼠标后侧键——左轮若还在背包里会当场拔出，世界以十分之一速播 0.7 秒（拔枪亮相），画面染黄，标志性启动音效响起，就是大镖客里死神之眼的味道；0.7 秒后世界固定降到 0.01 倍——剩下的抬枪动作会在极慢的流速里一路贯穿整个标记过程。
+- 进入模式的瞬间还有大镖客同款的白色刮屏：一道亮白、边缘撕裂状的划痕从随机一侧横向刮过全屏（约半秒），与黄滤镜的沉淀同时发生。纯外观（HUD 层程序生成的一张贴图），就算刚进模式就取消，划痕也会自然刮完。
 - 标记期间，启动音效播完后会接上一段循环背景音，标记环节一结束就停——进入处决、按取消键、疲劳耗尽，任何退出方式都算。
 - 准星对着活物按下鼠标中键——它身上出现一个红色标记并跟着动物移动，同时一声短音效确认标记成功。
 - 同一只动物可以标多次，也可以标多只——标记总数永远不会超过左轮弹巢里剩下的子弹数。

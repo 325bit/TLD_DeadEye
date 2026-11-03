@@ -148,6 +148,7 @@ public class DeadEyeMod : MelonMod
         {
             if (Settings == null)
                 return;
+            ScratchFx.Draw(); // activation wipe: self-terminating, independent of the mode state
             Overlay.Draw();
         }
         catch (Exception ex)

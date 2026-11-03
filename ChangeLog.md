@@ -1,5 +1,10 @@
 # ChangeLog
 
+## 0.7.26
+
+- **New visual: the activation scratch wipe.** Entering Dead Eye now sweeps a bright, feathery white streak horizontally across the whole screen in ~0.5 s (unscaled), starting from a random side — modelled on the RDR2 activation (reference clip 10-11 s: hot head, torn streaky tail, warm tone settling behind it). It runs while the draw reveal plays and finishes even if the mode is cancelled immediately.
+- Implementation is one procedurally generated RGBA strip (256x128, regenerated per activation: column streaks, torn gaps, grain and a wavy head line over a power-falloff envelope) drawn in the existing OnGUI layer and mirrored at draw time for the right-to-left direction. No shaders, cameras or post-processing — IL2CPP strips the usual post stack, so the HUD layer is the only reliable canvas.
+
 ## 0.7.25
 
 - **Input lockout while the mode is up.** During marking and the execution the game no longer reacts to the left mouse button (fire), the right mouse button (aim) or the reload key R — firing or reloading mid-sequence fought the mod's own look-at glides and fire pacing. Blocked at the Hinterland input wrapper's concrete readers (`InputManager.GetKeyDown`, `GetMouseButtonDown`, `GetReloadPressed`, plus the `ProcessFireAction` entry as a second fence), so raw Unity input is untouched: the mode's own keys keep working, and movement, camera and every other binding are unaffected. All four prefixes are no-ops while the mode is off.
