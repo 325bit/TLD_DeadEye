@@ -1,5 +1,10 @@
 # ChangeLog
 
+## 0.7.21
+
+- **Footsteps are silenced while marking.** Entering the mode in mid-stride used to keep the step sounds going under the slow motion. The game has a flag for exactly this (`FootStepSounds.m_SupressFoostepAudio`, tested at the top of its footstep method and used by its own Audio_SuppressFootsteps action), so the mod flips it while the marking state is up and puts back the value it found when the phase ends — a cinematic that set the flag itself is not cleared.
+- Silent by design, no setting: the mode is a slow-motion stare, and a walking player is the one thing that should not be heard during it. Footprints and water splashes are untouched — only the audio is suppressed.
+
 ## 0.7.20
 
 - **Fixed: activating Dead Eye empty-handed left the revolver in the pack until the execution began.** The replayed equip events were timed on the scaled clock, and Dead Eye equips inside its own slow motion — 0.82 scaled seconds is 8 s at the 0.1x reveal speed and over a minute at the 0.01x marking speed, so the completion never arrived during marking. They now run on the real clock (0.06 s / 0.82 s wall time) and end early if the Animator has already left the swing state.

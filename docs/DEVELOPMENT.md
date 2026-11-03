@@ -20,6 +20,7 @@ RDR2-style Dead Eye for The Long Dark 2.55: bullet-time marking mode plus a chai
 | `Core/ModAudio.cs` | Loads the two WAV sound effects from `Mods/DeadEye/Asset` (hand-parsed RIFF/PCM16) and plays them through `winmm!waveOut` — one device handle per sound, so sounds overlap |
 | `Core/LoadedDraw.cs` | Draw-animation swap: turns the `immediate` quick-draw flag off and forces the loaded-cylinder variant, gated by the `ReplaceDrawAnimation` setting (§3, §10 #37) |
 | `Core/DrawProbe.cs` | Diagnostics for that swap: dumps the controller's clip names once, names every animator write through the game's hash fields, and opens a state/clip timeline on EVERY trigger (4.5 s for reloads) — Verbose only |
+| `Core/FootstepSilencer.cs` | Silences the player's footstep audio while marking by flipping the game's own `FootStepSounds.m_SupressFoostepAudio` flag, restoring the value it found when the phase ends |
 | `Ui/Overlay.cs` | Yellow Canvas filter + OnGUI markers and message line |
 | `Core/HomingSteering.cs` | Steers in-flight AdaptiveArsenal projectiles toward their own mark (homing bullets); leads that mark by the target's frozen velocity, cancels the muzzle error on the first frame, registered from the Fire prefix, ticked from the manager. Also resolves hits: the path test (`TestHitbox`) applies damage the moment the swept segment crosses a damageable collider, and `ResolveContact` does the same from the collision prefix |
 | `Core/RoundResolution.cs` | Dead Eye's own damage pipeline, replicated verbatim from AdaptiveArsenal's `TryInflictDamage` (distance falloff 400→200 over 5 km, `LocalizedDamage` scale and bleed-out, the critical-hit roll, shot stat + skill point, `SetupDamageForAnim` + `ApplyDamage`) plus its impact puff / decal / audio; `IsDamageable` is the layer 16/27 + `LocalizedDamage` filter both resolution paths share |
@@ -203,7 +204,7 @@ All output goes through `ModLog` with the `[DEBUG]` prefix gated by the Verbose 
 
 ## 12. Compatibility
 
-- Touches: `Time.timeScale` + `GameManager.m_GlobalTimeScale` (only while `Owned`), `Fatigue.m_CurrentFatigue` (flat drain while marking), freshly spawned projectile transforms/velocity (only for shots committed by this mod, TTL 0.5 s), the player look state via the game's own look-at system (only while firing).
+- Touches: `Time.timeScale` + `GameManager.m_GlobalTimeScale` (only while `Owned`), `Fatigue.m_CurrentFatigue` (flat drain while marking), freshly spawned projectile transforms/velocity (only for shots committed by this mod, TTL 0.5 s), the player look state via the game's own look-at system (only while firing), and `FootStepSounds.m_SupressFoostepAudio` while marking (restored on exit — that flag is also what the game's own `Audio_SuppressFootsteps` action sets).
 - **AdaptiveArsenal**: detected at startup (reflection on `AdaptiveArsenal.Components.ProjectileItem`, no hard dependency). When present, Dead Eye binds a postfix onto its private `ProjectileItem.Fire` and switches ballistics to its effective speeds (table x 0.5 + gravity). When absent, the vanilla `vp_Bullet.Start` redirect is used.
 - Conflicts possible with mods that also drive the global time scale (slow-motion, radial-menu slow-down) or redirect projectiles while the mode is active; nothing is written outside the mode.
 - No item definitions, prefabs, save data or Wwise banks are modified.

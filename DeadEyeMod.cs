@@ -131,6 +131,15 @@ public class DeadEyeMod : MelonMod
         {
             LoggerInstance.Error("draw animation tick failed: " + ex);
         }
+
+        try
+        {
+            FootstepSilencer.Tick();
+        }
+        catch (Exception ex)
+        {
+            LoggerInstance.Error("footstep silence tick failed: " + ex);
+        }
     }
 
     public override void OnGUI()
