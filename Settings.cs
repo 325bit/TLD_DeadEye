@@ -119,7 +119,22 @@ internal class Settings : JsonModSettings
     [Description("黄色滤镜的浓度，0 = 全透明（等于关闭滤镜）。")]
     [Slider(0f, 0.6f)]
     public float OverlayOpacity = 0.22f;
+#if DEBUG
+    [Section("刮屏特效")]
 
+    [Name("刮屏白带宽度")]
+    [Description("启动死神之眼时扫过的白色光斑宽度，以屏幕宽度的比例表示。0.30 = 当前调校值。调整后立刻生效。")]
+    [Slider(0.10f, 1.50f)]
+    public float ScratchBlobWidth = 1.5f;
+
+    [Name("刮屏扫过时长")]
+    [Description("白色光斑从一侧扫到另一侧所花的时间（秒），越小越快。0.6 = 当前调校值。调整后立刻生效。")]
+    [Slider(0.10f, 1.50f)]
+    public float ScratchDuration = 0.3f;
+#else
+    internal float ScratchBlobWidth = 1.5f;
+    internal float ScratchDuration = 0.3f;
+#endif
     [Section("音效")]
 
     [Name("音效音量")]

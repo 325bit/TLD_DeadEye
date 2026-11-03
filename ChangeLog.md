@@ -1,5 +1,10 @@
 # ChangeLog
 
+## 0.7.35
+
+- **New settings: 刮屏白带宽度 (0.15-0.60, default 0.30) and 刮屏扫过时长 (0.3-1.5 s, default 0.6)** under a new 刮屏特效 section — the sweeping band's width and speed are now tunable in-game for live testing instead of being compiled constants.
+- **The horizontal scanlines are gone.** Cause: both the veil and the blob textures modulated alpha PER ROW (a "feather" design inherited from the tail era) — each of the 128 texture rows stretches to ~8 px of screen and spans the full width, so adjacent rows differing by up to 5x in strength rendered as full-width horizontal stripes; inside the bright band the same modulation drew brighter lines. Both textures are now smooth (per-pixel grain only, the veil keeps its gentle lower-middle emphasis), leaving just the wide, slightly tilted white band.
+
 ## 0.7.34
 
 - **The scratch is now a static veil + a sweeping glow, by design.** Pixel measurement of the 0.7.32 capture proved the remaining "straight line" was not a seam but the tail haze's VISIBILITY ONSET: the tail alpha ramps from zero, white-over-bright-scene becomes perceptible at alpha ≈ 0.045, and the point where the ramp crosses that threshold travels with the strip as a coherent, leaning line — a perceptual edge no envelope curve can remove, because removing the ramp's steepness just moves the line.

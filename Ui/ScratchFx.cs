@@ -4,14 +4,14 @@ namespace DeadEye.Core;
 
 /// <summary>
 /// RDR2-style white scratch on Dead Eye activation — veil variant. Two layers:
-/// 1. A full-screen fibrous white VEIL that appears the moment the mode starts (same frame
+/// 1. A full-screen white VEIL that appears the moment the mode starts (same frame
 ///    as the yellow tint) and fades out globally over the second half of the sweep. Its
 ///    alpha has NO spatial gradient, so there is no moving visibility boundary — the
 ///    "onset line" class of artifact (0.7.27-0.7.32) cannot exist by construction.
-/// 2. The bright head GLOW: a soft round-edged blob (forward and backward Gaussian, plus
+/// 2. The bright head GLOW: a soft wide band (forward and backward Gaussian, plus
 ///    the vertical lower-middle mask) that sweeps across the veil in ~0.6 s unscaled from a
 ///    random side, with a small random lean. This is the only moving element; every edge
-///    of it is a Gaussian.
+///    of it is a Gaussian. Width and sweep duration are user settings.
 /// Both layers are procedural RGBA textures drawn in OnGUI (one DrawTexture each).
 /// Purely cosmetic: no game objects, shaders, cameras or post-processing are touched, and
 /// the sweep self-terminates — it finishes even if the mode is cancelled mid-reveal.
@@ -47,7 +47,8 @@ internal static class ScratchFx
         if (_start < 0f || _veil == null || _blob == null)
             return;
 
-        float p = (Time.unscaledTime - _start) / DurationSeconds;
+        float duration = Mathf.Max(0.1f, DeadEyeMod.Settings?.ScratchDuration ?? DurationSeconds);
+        float p = (Time.unscaledTime - _start) / duration;
         if (p >= 1f)
         {
             _start = -1f;
@@ -74,7 +75,7 @@ internal static class ScratchFx
     /// <summary>The sweeping head glow: texture-authored glow edge->centre->glow edge, mirrored for R2L.</summary>
     private static void DrawBlob(float p)
     {
-        float w = Screen.width * BlobWidthFraction;
+        float w = Screen.width * Mathf.Clamp01(DeadEyeMod.Settings?.ScratchBlobWidth ?? BlobWidthFraction);
 
         // Near-linear motion with a soft landing (the reference reads as constant speed).
         float eased = 1f - Mathf.Pow(1f - p, 1.2f);
@@ -110,33 +111,17 @@ internal static class ScratchFx
     }
 
     /// <summary>
-    /// Shared row-wisp field: per-row strength in a WIDE range with frequent tears, so the
-    /// fog reads as discrete horizontal fibres with the world showing through between them
-    /// (the narrow 0.55-1.0 range of 0.7.32 made the veil a coherent wall).
-    /// </summary>
-    private static float[] BuildRowWisps()
-    {
-        var streak = new float[TexH];
-        for (int y = 0; y < TexH; y++)
-        {
-            float s = 0.20f + 0.80f * UnityEngine.Random.value;
-            if (UnityEngine.Random.value < 0.20f)
-                s *= 0.30f;
-            streak[y] = s;
-        }
-        return streak;
-    }
-
-    /// <summary>
-    /// The veil: uniform along x (no spatial alpha ramp — that is the whole point), fibrous
-    /// along y, with a gentle lower-middle emphasis so it does not read as a flat grey plate.
+    /// The veil: uniform along x AND y apart from the gentle lower-middle emphasis and a
+    /// whisper of per-pixel grain. The old per-row wisp field rendered as full-width
+    /// horizontal stripes (each of the 128 texture rows stretches to ~8 px of screen and
+    /// adjacent rows differed by up to 5x in strength) — that is where the white
+    /// scanlines across the whole frame came from.
     /// </summary>
     private static void BuildVeil()
     {
         if (_veil == null)
             _veil = NewTex();
 
-        var streak = BuildRowWisps();
         var px = new Color32[TexW * TexH];
         for (int y = 0; y < TexH; y++)
         {
@@ -147,8 +132,8 @@ internal static class ScratchFx
             int row = y * TexW;
             for (int x = 0; x < TexW; x++)
             {
-                float grain = 0.80f + 0.20f * UnityEngine.Random.value;
-                float a = vmask * streak[y] * grain;
+                float grain = 0.92f + 0.08f * UnityEngine.Random.value;
+                float a = vmask * grain;
                 px[row + x] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(a) * 255f));
             }
         }
@@ -160,14 +145,14 @@ internal static class ScratchFx
     /// <summary>
     /// The sweeping glow: a round-edged blob centred in the strip (Gaussian along x, so it
     /// fades out BOTH ways from the centre — no leading or trailing cut), weighted by the
-    /// lower-middle vertical mask and light row fibres.
+    /// lower-middle vertical mask. Smooth on purpose: the row-fibre modulation of earlier
+    /// builds is what drew horizontal lines through the band.
     /// </summary>
     private static void BuildBlob()
     {
         if (_blob == null)
             _blob = NewTex();
 
-        var streak = BuildRowWisps();
         var px = new Color32[TexW * TexH];
         for (int y = 0; y < TexH; y++)
         {
@@ -181,8 +166,8 @@ internal static class ScratchFx
                 float t = x / (TexW - 1f);
                 float dx = (t - 0.5f) / 0.22f;
                 float blob = Mathf.Exp(-dx * dx); // fades BOTH ways from the centre
-                float grain = 0.72f + 0.28f * UnityEngine.Random.value;
-                float a = vmask * Mathf.Clamp01(blob + 0.25f * blob * streak[y] * grain);
+                float grain = 0.94f + 0.06f * UnityEngine.Random.value;
+                float a = vmask * blob * grain;
                 px[row + x] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(a) * 255f));
             }
         }

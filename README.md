@@ -2,7 +2,7 @@
 
 [English](#english) · [中文](#中文)
 
-![version](https://img.shields.io/badge/version-0.7.34-informational)
+![version](https://img.shields.io/badge/version-0.7.35-informational)
 
 ![game](https://img.shields.io/badge/The%20Long%20Dark-2.55-success)
 
@@ -78,6 +78,8 @@ Settings live under **Options → Mod Settings → Dead Eye (死神之眼)**.
 | 疲劳每秒消耗 | Fatigue drain while marking, as a percentage of the full bar per real-time second; raise it to pay more | 1 |
 | 黄色滤镜 | Fullscreen yellow tint while marking. **Off** leaves the normal colours | On |
 | 滤镜不透明度 | Strength of the yellow tint; 0 equals no tint | 0.22 |
+| 刮屏白带宽度 | Width of the white band that sweeps across on activation, as a fraction of screen width | 0.30 |
+| 刮屏扫过时长 | How long the band takes to cross the screen, in seconds; lower is faster | 0.6 |
 | 音效音量 | Volume of the activation and mark sounds; 0 is silent | 0.8 |
 | 输出详细日志 | Writes mode transitions, marks and shots to `MelonLoader/Latest.log` | Off |
 
@@ -192,6 +194,8 @@ MIT — see [LICENSE](LICENSE).
 | 疲劳每秒消耗 | 标记期间每秒（真实时间）消耗疲劳上限的百分比；调大付出更多 | 1 |
 | 黄色滤镜 | 标记期间全屏黄色滤镜；关掉则保持原色 | 开 |
 | 滤镜不透明度 | 黄色滤镜浓度；0 等于没有滤镜 | 0.22 |
+| 刮屏白带宽度 | 启动死神之眼时扫过的白色光斑宽度（占屏幕宽度的比例） | 0.30 |
+| 刮屏扫过时长 | 白色光斑扫过全屏所花的时间（秒），越小越快 | 0.6 |
 | 音效音量 | 进入音效与标记音效的音量；0 = 静音 | 0.8 |
 | 输出详细日志 | 把模式切换、标记、开火记录写进 `MelonLoader/Latest.log` | 关 |
 
