@@ -67,6 +67,12 @@ internal class Settings : JsonModSettings
     [Description("默认 Q 键。标记模式下按下会立刻放弃所有已打的标记并退出死神之眼，不会开火（切换键在有标记时是进入处决，这个键是直接取消）。")]
     public KeyCode CancelKey = KeyCode.Q;
 
+    [Section("处决")]
+
+    [Name("标记满自动开火")]
+    [Description("标记个数到达上限（等于左轮剩余子弹数）的瞬间自动进入处决开火，不用再按一次切换键。关掉则保持原行为：上限后仍需手动按切换键开始射击。")]
+    public bool AutoFireAtCap = true;
+
 #if DEBUG
     [Section("子弹时间")]
 

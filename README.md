@@ -2,7 +2,7 @@
 
 [English](#english) · [中文](#中文)
 
-![version](https://img.shields.io/badge/version-0.7.22-informational)
+![version](https://img.shields.io/badge/version-0.7.23-informational)
 
 ![game](https://img.shields.io/badge/The%20Long%20Dark-2.55-success)
 
@@ -56,7 +56,7 @@ A The Long Dark mod that slows the world down, lets you mark animals like RDR2's
 
 1. Carry the revolver selected in the settings (it can stay in your pack).
 2. Press the side mouse button — time slows, the revolver is drawn if it was stowed, the screen turns yellow, and "死神之眼 · 标记目标" appears. The draw speed (0.1x) only lasts the first 0.7 s; the world then drops to the fixed marking speed (0.01x) so the rest of the raise crawls through the whole marking phase.
-3. Aim at an animal and press the middle mouse button — a red mark appears; repeat up to the mark cap.
+3. Aim at an animal and press the middle mouse button — a red mark appears; repeat up to the mark cap. Reaching the cap starts the execution by itself (switchable off in the settings).
 4. Press the side mouse button again — the marking phase ends and every mark is shot in order. The yellow tint and the slowdown carry through the whole execution, while your own actions (draw, fire rate) run at normal speed. If nothing was marked, the same press ends the mode immediately. Press the cancel key (Q) instead to abort: all marks are discarded and nothing is fired.
 
 Settings live under **Options → Mod Settings → Dead Eye (死神之眼)**.
@@ -71,6 +71,7 @@ Settings live under **Options → Mod Settings → Dead Eye (死神之眼)**.
 | 进入 / 退出死神之眼 | Key that starts and ends the mode; click the box and press any key or mouse button to rebind | 鼠标后侧键 |
 | 标记目标 | Key that marks what is under the crosshair; rebindable the same way | 鼠标中键 |
 | 取消标记模式 | Cancels the mode outright while marking: every mark is discarded and nothing is fired (the toggle key with marks starts the execution instead) | Q |
+| 标记满自动开火 | Reaching the mark cap (= rounds left in the cylinder) starts the execution by itself, no extra press needed. Off = the old behaviour: the toggle key still has to be pressed | On |
 | 疲劳每秒消耗 | Fatigue drain while marking, as a percentage of the full bar per real-time second; raise it to pay more | 1 |
 | 黄色滤镜 | Fullscreen yellow tint while marking. **Off** leaves the normal colours | On |
 | 滤镜不透明度 | Strength of the yellow tint; 0 equals no tint | 0.22 |
@@ -166,7 +167,7 @@ MIT — see [LICENSE](LICENSE).
 
 1. 携带设置里选定的那把左轮（放背包里也行）。
 2. 按鼠标后侧键——时间放慢；左轮若还在背包里会当场拔出来；画面变黄，屏幕出现「死神之眼 · 标记目标」。前 0.7 秒是 0.1 倍，之后世界固定降到 0.01 倍，剩下的抬枪动作在极慢的流速里贯穿整个标记过程。
-3. 准星对准动物按鼠标中键——出现红色标记，可一直标到上限。
+3. 准星对准动物按鼠标中键——出现红色标记，可一直标到上限。标满上限的瞬间自动进入处决（设置里可关）。
 4. 再按一次鼠标后侧键——结束标记、进入处决；黄滤镜和慢动作持续到处决结束，人物动作保持正常速率。若没有标记，则立刻结束死神之眼。改按取消键（Q）则直接放弃：所有标记作废，不开火退出。
 
 设置入口：**选项 → Mod Settings → Dead Eye (死神之眼)**。
@@ -181,6 +182,7 @@ MIT — see [LICENSE](LICENSE).
 | 进入 / 退出死神之眼 | 开启和结束模式的键；点输入框再按任意键或鼠标键可重绑 | 鼠标后侧键 |
 | 标记目标 | 把准星下的目标标记下来的键；重绑方式相同 | 鼠标中键 |
 | 取消标记模式 | 标记模式下按下直接取消：放弃全部已打的标记、不开火退出（有标记时按切换键是进入处决，按这个键是放弃） | Q |
+| 标记满自动开火 | 标记个数到达上限（等于左轮剩余子弹数）的瞬间自动进入处决开火，不用再按切换键。关掉则保持原行为：仍需手动按切换键开始射击 | 开 |
 | 疲劳每秒消耗 | 标记期间每秒（真实时间）消耗疲劳上限的百分比；调大付出更多 | 1 |
 | 黄色滤镜 | 标记期间全屏黄色滤镜；关掉则保持原色 | 开 |
 | 滤镜不透明度 | 黄色滤镜浓度；0 等于没有滤镜 | 0.22 |

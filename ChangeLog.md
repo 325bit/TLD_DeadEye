@@ -1,5 +1,10 @@
 # ChangeLog
 
+## 0.7.23
+
+- **New setting: 标记满自动开火 (on by default).** The mark that reaches the cap — which equals the rounds left in the revolver's cylinder — starts the execution the moment it lands, so the last press of the marking flow is the last mark itself instead of one more toggle press. Switchable off in the settings page (new 处决 section); with it off the old behaviour is kept exactly.
+- The auto-start goes through the same `StartFiring` path as the toggle key (same look-at glide, same pacing), and the log line distinguishes it (`mark cap reached, starting the execution automatically`). The cap-reached hint overlay stays as the fallback when the setting is off.
+
 ## 0.7.22
 
 - **New key: 取消标记模式 (default Q).** While the marking phase is up, pressing it discards every mark placed so far and leaves Dead Eye immediately — no shots are fired. It is checked before the toggle key, so a cancel is never swallowed even on the same frame: the toggle with marks starts the execution, the cancel key aborts it outright. Rebindable in the settings page like the other two keys.

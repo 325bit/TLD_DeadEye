@@ -838,6 +838,14 @@ internal static class DeadEyeManager
                          $"{(markPoint - ai.transform.position).magnitude:F2} m from root, " +
                          $"crosshair miss {miss:F2} m, aim {(markAim - markPoint).magnitude:F2} m off it " +
                          $"(fraction {AnimalBody.PreyAimFraction:F2}), " + AnimalBody.DescribeBody(ai));
+            // Auto-fire: the mark that reaches the cap (= rounds left in the cylinder) is
+            // also the last one the sequence can shoot, so the execution starts by itself
+            // instead of waiting for another toggle press (setting-gated).
+            if (_marks.Count >= MarkCap && DeadEyeMod.Settings!.AutoFireAtCap)
+            {
+                ModLog.Info("mark cap reached, starting the execution automatically");
+                StartFiring();
+            }
             return;
         }
 
