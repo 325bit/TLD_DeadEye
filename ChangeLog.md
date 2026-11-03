@@ -1,5 +1,15 @@
 # ChangeLog
 
+## 0.7.33
+
+- **The tint no longer rides with the scratch — full yellow from the first frame again.** The split-tint experiment (0.7.27-0.7.30: drawing the tint in OnGUI split at the scratch head, canvas suppressed until the sweep ends) produced every hard-line artifact we chased: the unclipped-rect revert region, the rect-end clip line, and finally a 1 px float seam between the solid and gradient rects that showed as a thin coloured line over the scene (0.7.30 capture). The seam class cannot be fully trusted away while two translucent rects must tile edge-to-edge every frame, so the whole path is removed: the canvas overlay goes full yellow the moment the mode starts (as before 0.7.27) and the white scratch — which has no hard edges since 0.7.31 — sweeps over it. Trade-off by choice: the tone boundary no longer follows the head, but no tint seam can exist at all.
+- `Overlay.SetTintSuppressed` and the gradient texture are gone; the sweep is a single `DrawTexture` call.
+
+## 0.7.32
+
+- **The streak is thicker and slightly tilted.** The bright head cloud's Gaussian widened (σ 0.07 → 0.12 of the strip) together with the vertical mask (0.26 → 0.30), so the white column reads as a broad burn across the frame instead of a narrow pillar. The whole strip is now drawn rotated by a small random lean (3.5-8°, random sign, set per activation) around the head point, like the reference's scratch — the strip is oversized vertically (1.35×) so it still spans the full screen height after the rotation.
+- Housekeeping: the previous build's rect geometry edits had partially not landed in the source (the deployed 0.7.31 paired the new blob placement with the old rect placement); this build pins the blob centre to the head line explicitly in `DrawStreak` and was verified warning-free.
+
 ## 0.7.31
 
 - **Fixed: the streak's leading edge was a hard vertical line.** The head cloud's Gaussian was centred on the texture's edge, so the brightest point of the streak had full alpha on one side and NOTHING on the other — wherever the head line was, the white glow simply stopped (the 0.7.30 capture shows it at ~97% screen width). The strip now reserves its last 25% for the forward glow: the blob centre sits at 75% and decays past the head line in the travel direction, so the head radiates forward like a light bloom and fades out with no cut. Rect placement updated for both directions (head centre stays pinned to headX).

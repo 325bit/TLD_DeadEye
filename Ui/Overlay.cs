@@ -17,9 +17,8 @@ internal static class Overlay
     private static float _messageUntil;
 
     private static Texture2D? _whiteTex;
-    private static bool _tintSuppressed; // scratch sweep owns the tint split while true
 
-    /// <summary>Solid white 4x4, shared by markers and the scratch sweep's tint rects.</summary>
+    /// <summary>Solid white 4x4, shared by the marker bars.</summary>
     internal static Texture2D WhiteTex
     {
         get
@@ -49,28 +48,10 @@ internal static class Overlay
         EnsureCanvas();
         if (_canvas != null && _image != null)
         {
-            ApplyTintColor();
+            float opacity = Mathf.Clamp01(DeadEyeMod.Settings?.OverlayOpacity ?? 0.22f);
+            _image.color = new Color(1f, 0.82f, 0.15f, opacity);
             _canvas.SetActive(true);
         }
-    }
-
-    /// <summary>
-    /// While the activation scratch sweeps, the split tint is drawn in OnGUI behind the
-    /// scratch head; the canvas tint must stay invisible until the sweep hands back.
-    /// </summary>
-    internal static void SetTintSuppressed(bool suppressed)
-    {
-        _tintSuppressed = suppressed;
-        if (_image != null)
-            ApplyTintColor();
-    }
-
-    private static void ApplyTintColor()
-    {
-        if (_image == null)
-            return;
-        float opacity = Mathf.Clamp01(DeadEyeMod.Settings?.OverlayOpacity ?? 0.22f);
-        _image.color = new Color(1f, 0.82f, 0.15f, _tintSuppressed ? 0f : opacity);
     }
 
     internal static void SetMessage(string message, float seconds)
