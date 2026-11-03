@@ -1,5 +1,52 @@
 # ChangeLog
 
+## 0.7.20
+
+- **Fixed: activating Dead Eye empty-handed left the revolver in the pack until the execution began.** The replayed equip events were timed on the scaled clock, and Dead Eye equips inside its own slow motion — 0.82 scaled seconds is 8 s at the 0.1x reveal speed and over a minute at the 0.01x marking speed, so the completion never arrived during marking. They now run on the real clock (0.06 s / 0.82 s wall time) and end early if the Animator has already left the swing state.
+- Ordinary draws are unchanged in feel; only the timing source moved.
+- This round is also the first **DEBUG** build of the mod, so the tuning sliders (弹道 / 子弹时间) are back in the settings page.
+
+## 0.7.19
+
+- **The draw is now replaced, not appended.** 0.7.18 played the vanilla raise first and the swing after it. The equip trigger the game fires is now cancelled again in the same frame (before the Animator evaluates it), and the reload-close swing is cross-faded in — the vanilla raise never appears.
+- **The equip flow still completes.** The equip clip is also what raises the game's `ShowItem` and `Complete` animation events, so both are replayed by the mod at the offsets the swing reaches them (0.06 s and 0.82 s of animator time), on the SCALED clock so they keep pace under bullet time. `IsEquipped`, the callbacks and the item in hands therefore settle exactly as before.
+- Only revolvers, only with 拔枪动作替换 on. `.25 s` duplicate-trigger guard, because the game calls the equip trigger twice per draw.
+- If a future game update changes the state hash the cross-fade becomes a no-op: the vanilla raise then plays and the replayed events arrive early, which is survivable but visible — the tape prints the real hash on every reload.
+
+## 0.7.18
+
+- **The wanted motion is identified, and the swap is now built on it.** It is not a draw: the "pull the gun down out of frame, then swing it back up" flourish is the second half of **`FPH_Revolver_Reload_Close`** (state hash `-2113718774`, 1.63 s), recorded off a reload finish and confirmed frame by frame in the capture. The revolver has exactly one equip clip (`FPH_Revolver_Equip`), so nothing else could have been it.
+- **How it is applied:** when the game signals the end of an equip (`OnAnimationEvent_Generic_Equip_Complete`), the mod cross-fades into that state at 0.5 normalized — the point where the gun has been pulled down — so the draw ends with the swing instead of settling into the idle pose. The cross-fade is 0.12 s; the equip flow itself is untouched, because the game's completion callback has already run.
+- Setting-gated (拔枪动作替换, default on). Revolvers only. The `IsLoaded`/`immediate` overrides stay as harmless no-ops.
+- If the game update ever changes the state hash, the cross-fade becomes a no-op and the log says so; the tape prints the real hash on every reload finish.
+
+## 0.7.17
+
+- **Diagnostics only.** The tape now runs continuously while 输出详细日志 is on, not only inside a draw session: the animation being hunted fires no equip trigger, so a recorder that only listens where it expects something will keep missing it. One line per state/clip change, with the draw session's tag and offset when one is active.
+- The full reload sequence is now on record: `Reload_Open` (0.53 s) → `Reload_Loop` → `Reload_Close` (1.63 s) → `Idle`, with `RoundsLoaded` climbing while `IsLoaded` flips true on the first round. No `Unequip_Reload` and no second equip clip appear anywhere in it.
+- Everything else (controller dump, trigger naming) unchanged.
+
+## 0.7.16
+
+- **Diagnostics only.** The controller inventory arrived: the first-person controller holds 517 clips, and the revolver set is `AimLoop, AimToIdle, Equip, Fire, HipFire, Idle, IdleToAim, Reload_Open, Reload_Loop, Reload_Close, Unequip, Unequip_Reload` plus movement/walk/runs. **There is exactly one revolver draw clip (`FPH_Revolver_Equip`) — the `Equip_Loaded` / `Equip_Unloaded` pair exists only for the flare gun.** So the two draws are not two clips.
+- **The normal draw is cut short.** The equip timeline shows `FPH_Revolver_Equip` (2.70 s) entered at +270 ms and left again at normalized time **0.46** for `FPH_Revolver_Idle` — only the first half is ever shown, which is the "small raise".
+- **Every trigger now opens its own timeline** (`Trigger_Generic_Reload*` gets 4.5 s): the raise that reportedly follows a reload fires no equip trigger, so it has to be captured from whatever trigger it does use.
+- Hash naming, the per-draw state/clip timeline and the dump stay as in 0.7.15, all behind 输出详细日志.
+
+## 0.7.15
+
+- **Diagnostics only — the draw swap itself is unchanged and still does not work.** 0.7.14 proved that neither `immediate` nor `IsLoaded` selects the animation, so the next step is measuring instead of guessing.
+- **The first-person controller is now dumped once per session**: every clip name it holds is printed (sorted, six per line). The controller is a binary asset, so this is the only way to see whether a second revolver draw clip exists at all.
+- **Every animator write is named.** `PlayerAnimation.SetTrigger/SetBool/SetInt` are hooked, and the hash is translated through the game's own `m_AnimParameter_*` fields, so the log reads `trigger Trigger_Generic_Unstow` or `int RoundsLoaded = 6` instead of an integer. Triggers always log; bools/ints log only for the weapon parameters and at most every 200 ms.
+- **Each equip/unstow now records a timeline** (every 80 ms for 2.4 s, one line per state/clip *change*): state hash, normalized time, clip names with weights, `IsLoaded`/`RoundsLoaded`/`IsEquipped`. This is what maps an action to the clip it plays — the question both failed attempts guessed at.
+- All of it is behind 输出详细日志; with the setting off the probes cost one cached boolean test per write.
+
+## 0.7.14
+
+- **The draw swap was patched at the wrong half of the mechanism.** 0.7.13 only forced the `IsLoaded` animator bool, and a test session changed nothing: two different *triggers*, not two different bools, produce the two draws. `Trigger_Generic_Equip` ends with `immediate ? SetTrigger(Equip_Immediate) : SetTrigger(Equip)` — the `immediate` argument selects `Equip_Immediate`, the short raise from the bottom of the screen — and the ammo-derived `IsLoaded` only follows it. A prefix now forces `immediate = false` for revolvers, so every equip path takes the full draw; the `IsLoaded` force stays for an empty cylinder.
+- **Both halves are one setting** (拔枪动作替换, on by default): the prefix for the trigger, the postfix for the bool, the completion event for the restore.
+- **New diagnostic: `draw probe`.** With 输出详细日志 on, every equip and unstow trigger is sampled at +50/250/600/1200 ms and logs the Animator state hash, the playing clip names with their weights and the `IsLoaded`/`RoundsLoaded` values — the controller is a binary asset, so a wrong assumption has to surface in the log rather than as "it did nothing". The unstow trigger (the wide draw after a stow) is sampled too, as the reference the swap imitates.
+
 ## 0.7.13
 
 - **New setting: 拔枪动作替换 (on by default).** Every revolver draw now plays the wide "loaded cylinder" animation — the one that sweeps in from the lower right — even when the cylinder is empty; vanilla plays a shorter raise from the bottom for an empty revolver. It covers all four revolvers and every way of drawing one, including the automatic draw when the mode starts, and it can be switched off in the settings page.

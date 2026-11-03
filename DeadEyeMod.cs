@@ -125,6 +125,7 @@ public class DeadEyeMod : MelonMod
         try
         {
             LoadedDraw.Tick();
+            DrawProbe.Tick();
         }
         catch (Exception ex)
         {

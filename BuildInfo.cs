@@ -7,7 +7,7 @@ internal static class BuildInfo
 {
     internal const string Name = "TLD_DeadEye";
     internal const string GUIName = "Dead Eye (死神之眼)";
-    internal const string Version = "0.7.13";
+    internal const string Version = "0.7.20";
     internal const string Author = "Hemalurgic";
 
     /// <summary>

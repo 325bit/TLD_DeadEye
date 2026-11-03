@@ -268,17 +268,20 @@ internal static class AdaptiveProjectileRedirectPatch
 }
 
 /// <summary>
-/// Draw-animation swap (see <see cref="Core.LoadedDraw"/>): the game decides which revolver
-/// draw to play by writing the animator bool `IsLoaded` from the cylinder's round count a few
-/// instructions before it fires the equip trigger. Overwriting that value here lands after the
-/// game's write and before the Animator evaluates the transition; the switch itself never
-/// changes, so nothing about ammo, firing or reloading is affected.
+/// Draw-animation swap (see <see cref="Core.LoadedDraw"/>). The prefix turns the game's
+/// `immediate` quick-draw flag off (it swaps the trigger for `Equip_Immediate`, the short raise
+/// from the bottom of the screen); the postfix then overrides the `IsLoaded` animator bool the
+/// game derives from the cylinder's round count. Neither the trigger itself nor the ammo count
+/// is touched, so the equip flow and the weapon state are unaffected.
 /// </summary>
 [HarmonyPatch(typeof(PlayerAnimation), nameof(PlayerAnimation.Trigger_Generic_Equip))]
 internal static class EquipDrawPatch
 {
+    private static void Prefix(PlayerAnimation __instance, GearItem gearItem, ref bool immediate)
+        => Core.LoadedDraw.BeforeEquip(ref immediate, __instance, gearItem);
+
     private static void Postfix(PlayerAnimation __instance, GearItem gearItem)
-        => Core.LoadedDraw.OnEquipTriggered(__instance, gearItem);
+        => Core.LoadedDraw.AfterEquip(__instance, gearItem);
 }
 
 /// <summary>The draw's own completion event — where the animator gets the real value back.
@@ -287,5 +290,49 @@ internal static class EquipDrawPatch
 internal static class EquipDrawCompletePatch
 {
     private static void Postfix(PlayerAnimation __instance) => Core.LoadedDraw.OnEquipComplete(__instance);
+}
+
+/// <summary>Diagnostics only: samples the animation the stowed-weapon draw plays, so a session
+/// can compare it with the equip draw the swap replaces.</summary>
+[HarmonyPatch(typeof(PlayerAnimation), nameof(PlayerAnimation.Trigger_Generic_Unstow))]
+internal static class UnstowProbePatch
+{
+    private static void Postfix(PlayerAnimation __instance) => Core.LoadedDraw.OnUnstow(__instance);
+}
+
+/// <summary>
+/// Diagnostics only: names every trigger the game fires. `__args` is used instead of named
+/// parameters on purpose — the interop stub's parameter names are generated, and a mismatch
+/// would make Harmony reject the patch (taking the whole PatchAll down with it).
+/// </summary>
+[HarmonyPatch(typeof(PlayerAnimation), "SetTrigger")]
+internal static class AnimTriggerWritePatch
+{
+    private static void Prefix(PlayerAnimation __instance, object[] __args)
+        => Core.DrawProbe.OnWrite(__instance, "trigger", __args.Length > 0 ? (int)__args[0] : 0, string.Empty);
+}
+
+/// <summary>Diagnostics only: weapon-related bools (IsLoaded, IsEquipped, IsWeapon, …).</summary>
+[HarmonyPatch(typeof(PlayerAnimation), "SetBool")]
+internal static class AnimBoolWritePatch
+{
+    private static void Prefix(PlayerAnimation __instance, object[] __args)
+    {
+        if (__args.Length < 2)
+            return;
+        Core.DrawProbe.OnWrite(__instance, "bool", (int)__args[0], (bool)__args[1] ? "true" : "false");
+    }
+}
+
+/// <summary>Diagnostics only: weapon-related ints (RoundsLoaded, ReloadCount, WeaponId, …).</summary>
+[HarmonyPatch(typeof(PlayerAnimation), "SetInt")]
+internal static class AnimIntWritePatch
+{
+    private static void Prefix(PlayerAnimation __instance, object[] __args)
+    {
+        if (__args.Length < 2)
+            return;
+        Core.DrawProbe.OnWrite(__instance, "int", (int)__args[0], ((int)__args[1]).ToString());
+    }
 }
 

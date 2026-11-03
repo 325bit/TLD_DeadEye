@@ -24,13 +24,12 @@ internal class Settings : JsonModSettings
     [Description("开启后左轮的每一次拔枪都用「装弹后」那套幅度更大的动作（从右下方横扫入画），空弹巢也一样；原版空枪是从屏幕下方小幅抬起。纯外观：弹巢里的真实子弹数、射击与装弹逻辑都不受影响。")]
     public bool ReplaceDrawAnimation = true;
 
+#if DEBUG
     [Section("弹道")]
 
     [Name("子弹追踪")]
     [Description("处决时射出的子弹会一路修正方向、追着标记目标飞（需要安装 AdaptiveArsenal；原版弹道在出膛瞬间结算，无法追踪）。关掉则退回「出膛即锁定提前量」的旧行为。")]
     public bool HomingBullets = true;
-
-#if DEBUG
     [Name("追踪强度")]
     [Description("子弹飞行中转向追踪标记的力度。0.5 = 当前调校值；0.2 几乎不打弯，3 = 转得最急、最能咬住高速横移的目标。")]
     [Slider(0.2f, 3f)]
@@ -46,6 +45,7 @@ internal class Settings : JsonModSettings
     [Slider(0f, 0.5f)]
     public float NearMissRadius = 0.5f;
 #else
+    internal bool HomingBullets = true;
     internal float HomingStrength = 0.5f;
     internal float PreyAimFraction = 0.7f;
     internal float NearMissRadius = 0.5f;
@@ -77,9 +77,9 @@ internal class Settings : JsonModSettings
     public float FireRateMultiplier = 1.5f;
 
     [Name("进入渐变速度")]
-    [Description("进入标记模式时时间流速渐变到目标值的快慢，越大越快。5 = 当前调校值。")]
+    [Description("进入标记模式时时间流速渐变到目标值的快慢，越大越快。1.5 = 当前调校值。")]
     [Slider(0.5f, 5f)]
-    public float EnterLerpSpeed = 5f;
+    public float EnterLerpSpeed = 1.5f;
 
     [Name("退出渐变速度")]
     [Description("退出标记模式时时间流速恢复正常的快慢，越大越快。8 = 当前调校值。")]
@@ -88,7 +88,7 @@ internal class Settings : JsonModSettings
 #else
     internal float ExecutionTimeScale = 0.2f;
     internal float FireRateMultiplier = 1.5f;
-    internal float EnterLerpSpeed = 5f;
+    internal float EnterLerpSpeed = 1.5f;
     internal float ExitLerpSpeed = 8f;
 #endif
 
