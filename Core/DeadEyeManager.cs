@@ -619,6 +619,7 @@ internal static class DeadEyeManager
     {
         bool cancelled = reason == "cancel key";
         int discarded = _marks.Count;
+        ModAudio.StopLoop(); // marking is over: the loop stops even before the restore tail
         State = DeadEyeState.Exiting;
         Overlay.SetOverlay(false);
         _marks.Clear();
@@ -636,6 +637,7 @@ internal static class DeadEyeManager
         // ExecutionTimeScale (0.2). Only the player is compensated back toward
         // real time (first-person Animator + unscaled fire pacing, see TickFiring).
         var settings = DeadEyeMod.Settings!;
+        ModAudio.StopLoop(); // the loop belongs to marking; the execution keeps only the sting
         _awaitingDraw = false; // the draw phase never survives into the execution
         _holdForRounds = false; // a fresh sequence never starts inside the previous hold
         // Snap, do not ramp: the Animator compensation is 1/scale, so a ramp would leave

@@ -2,7 +2,7 @@
 
 [English](#english) · [中文](#中文)
 
-![version](https://img.shields.io/badge/version-0.7.23-informational)
+![version](https://img.shields.io/badge/version-0.7.24-informational)
 
 ![game](https://img.shields.io/badge/The%20Long%20Dark-2.55-success)
 
@@ -21,6 +21,7 @@ A The Long Dark mod that slows the world down, lets you mark animals like RDR2's
 **Bullet time**
 
 - Press the side mouse button while carrying a revolver — the revolver is drawn if it was stowed (the raise plays out in slow motion), time slows to a tenth speed for 0.7 s (the draw reveal), the screen tints yellow and the signature activation sound plays, like Dead Eye in Red Dead Redemption 2. When the reveal ends the world drops to the fixed deeper marking speed (0.01x), so the rest of the raise crawls through the whole marking phase.
+- While marking, a short background loop keeps playing once the activation sting finishes, and stops the moment marking ends — the execution starting, the cancel key, running out of fatigue, any exit.
 - Press the middle mouse button while looking at a live animal — a red mark appears over it and stays attached to the animal even while it moves, with a short sound confirming the mark.
 - You can mark the same animal several times or several animals in any order — the number of marks never exceeds the rounds left in the revolver's cylinder.
 
@@ -49,7 +50,7 @@ A The Long Dark mod that slows the world down, lets you mark animals like RDR2's
 ### Installation
 
 1. Make sure `MelonLoader/` exists in the game folder (install it and run the game once if not).
-2. Put `TLD_DeadEye.dll` into `TheLongDark/Mods`, and the `Asset` folder (the two `.wav` sound files) into `TheLongDark/Mods/DeadEye/Asset`.
+2. Put `TLD_DeadEye.dll` into `TheLongDark/Mods`, and the `Asset` folder (the three `.wav` sound files) into `TheLongDark/Mods/DeadEye/Asset`.
 3. Start the game.
 
 ### Usage
@@ -98,7 +99,7 @@ A `DEBUG` build of the same version exposes all seven as sliders under 弹道 / 
 
 - Responds only while a save is loaded and the gameplay HUD is up; in menus the keys have no effect and no time-scale change is ever left behind.
 - Does not modify item definitions, weapon stats or save files. While the mode is on, Dead Eye owns the time-scale value: other mods that also drive the game speed (for example TimeAccelerator, which resets the scale every frame from an interface-update prefix) take over again the moment Dead Eye ends, because this mod's re-assertion runs after theirs.
-- The sounds are two plain `.wav` files under `Mods/DeadEye/Asset`, played through the Windows audio interface (`winmm!waveOut`) — each sound owns its own device handle, so the mark chime and the activation sound can overlap freely. No game audio banks (Wwise) are touched and no Unity audio components are created.
+- The sounds are three plain `.wav` files under `Mods/DeadEye/Asset`, played through the Windows audio interface (`winmm!waveOut`) — each sound owns its own device handle, so the mark chime, the activation sting and the marking loop can overlap freely. The loop repeats device-side (`WHDR_LOOP`), so there is no gap between repeats. No game audio banks (Wwise) are touched and no Unity audio components are created.
 - **AdaptiveArsenal compatible**: detected automatically (with or without it, shots land on the marked point).
 
 ### FAQ
@@ -132,6 +133,7 @@ MIT — see [LICENSE](LICENSE).
 **子弹时间**
 
 - 携带左轮时按下鼠标后侧键——左轮若还在背包里会当场拔出，世界以十分之一速播 0.7 秒（拔枪亮相），画面染黄，标志性启动音效响起，就是大镖客里死神之眼的味道；0.7 秒后世界固定降到 0.01 倍——剩下的抬枪动作会在极慢的流速里一路贯穿整个标记过程。
+- 标记期间，启动音效播完后会接上一段循环背景音，标记环节一结束就停——进入处决、按取消键、疲劳耗尽，任何退出方式都算。
 - 准星对着活物按下鼠标中键——它身上出现一个红色标记并跟着动物移动，同时一声短音效确认标记成功。
 - 同一只动物可以标多次，也可以标多只——标记总数永远不会超过左轮弹巢里剩下的子弹数。
 
@@ -160,7 +162,7 @@ MIT — see [LICENSE](LICENSE).
 ### 安装
 
 1. 确认游戏目录下已有 `MelonLoader/` 文件夹（没有就先装 MelonLoader 并启动一次游戏）
-2. 把 `TLD_DeadEye.dll` 复制到 `TheLongDark/Mods/`，并把 `Asset` 文件夹（两个 `.wav` 音效）放到 `TheLongDark/Mods/DeadEye/Asset`
+2. 把 `TLD_DeadEye.dll` 复制到 `TheLongDark/Mods/`，并把 `Asset` 文件夹（三个 `.wav` 音效）放到 `TheLongDark/Mods/DeadEye/Asset`
 3. 重启游戏
 
 ### 使用
@@ -209,7 +211,7 @@ MIT — see [LICENSE](LICENSE).
 
 - 只在读档后、游戏 HUD 可用时响应；在菜单里按键无效果，也不会留下任何时间流速残留。
 - 不修改物品定义、武器数值与存档文件。模式开启期间由它独占时间流速：其它同样接管游戏速度的 mod（例如每帧重置流速的 TimeAccelerator）会在死神之眼结束后自动接管回来，因为本 mod 的重申发生在它们之后。
-- 音效是 `Mods/DeadEye/Asset` 下的两个普通 `.wav` 文件，通过 Windows 音频接口（`winmm!waveOut`）播放——每个音效独占一个播放通道，标记音与启动音可以同时响、互不打断；不触碰游戏音频库（Wwise），也不创建任何 Unity 音频组件。
+- 音效是 `Mods/DeadEye/Asset` 下的三个普通 `.wav` 文件，通过 Windows 音频接口（`winmm!waveOut`）播放——每个音效独占一个播放通道，标记音、启动音与循环背景音可以同时响、互不打断；循环在设备侧（`WHDR_LOOP`）自动重复，两遍之间没有空隙。不触碰游戏音频库（Wwise），也不创建任何 Unity 音频组件。
 - **与 AdaptiveArsenal 兼容**：自动探测有无该 mod，两种弹道下射击都落在标记点上。
 
 ### 常见问题

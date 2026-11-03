@@ -1,5 +1,11 @@
 # ChangeLog
 
+## 0.7.24
+
+- **New sound: the marking loop.** Once the activation sting finishes during the marking phase, a short background loop (`dead-eye-rdr2-cycle.wav`) starts on its own waveOut handle and keeps playing until marking ends. It stops the moment the execution begins (including the auto-fire path), or the mode exits any other way — toggle with no marks, the cancel key, fatigue, weapon stowed, scene change. The activation sting itself still rings out into the execution as before.
+- The repeat is device-side (`WHDR_LOOP` + `waveOutReset` to stop), so there is no gap between repeats and no extra watcher thread.
+- The new wav is OPTIONAL: an updated dll without it keeps the sting and the mark chime, and one warning line notes the loop is disabled. Installation now ships three `.wav` files in `Mods/DeadEye/Asset`.
+
 ## 0.7.23
 
 - **New setting: 标记满自动开火 (on by default).** The mark that reaches the cap — which equals the rounds left in the revolver's cylinder — starts the execution the moment it lands, so the last press of the marking flow is the last mark itself instead of one more toggle press. Switchable off in the settings page (new 处决 section); with it off the old behaviour is kept exactly.

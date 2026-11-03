@@ -16,10 +16,17 @@ namespace DeadEye.Core;
 internal static class ModAudio
 {
     private const string EnterFileName = "dead-eye-rdr2.wav";
+    private const string CycleFileName = "dead-eye-rdr2-cycle.wav";
     private const string MarkFileName = "dead-eye-mark.wav";
 
     private const int WaveMapper = -1;
     private const uint WhdrDone = 0x00000001;
+    // Device-side looping needs BOTH boundary flags on the header: dwLoops is ignored
+    // unless WHDR_BEGINLOOP and WHDR_ENDLOOP are both set (MS docs, waveOutWrite).
+    // 0.7.24 shipped with only BEGINLOOP, so the loop played exactly once — the measured
+    // symptom (one 3.97 s pass, then silence) matched the single-buffer duration.
+    private const uint WhdrBeginLoop = 0x00000004;
+    private const uint WhdrEndLoop = 0x00000008;
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     private struct WaveFormatEx
@@ -66,16 +73,36 @@ internal static class ModAudio
     private static extern int waveOutClose(IntPtr handle);
 
     private static string? _enterPath;
+    private static string? _cyclePath;    // optional: the marking loop stays silent when missing
     private static string? _markPath;
     private static bool _ready;
     private static bool _failed;
 
     private static CachedClip? _enterClip;
+    private static CachedClip? _cycleClip;
     private static CachedClip? _markClip;
     private static Playback? _background; // the long activation sound, the only one we stop
+    private static Playback? _cycleLoop;  // the marking loop, chained after the sting ends
+    private static bool _loopPending;     // true while marking: lets the sting's completion start the loop
+    private static readonly object _audioGate = new(); // guards _loopPending / _cycleLoop (sting thread vs main thread)
 
     internal static void PlayEnter() => Play(enter: true);
     internal static void PlayMark() => Play(enter: false);
+
+    /// <summary>
+    /// Stop the marking loop only. The activation sting is left alone: it is allowed to
+    /// ring out into the execution by design. Called when marking ends — execution starts
+    /// (StartFiring) or the mode exits (BeginExit / the end-of-mode Stop).
+    /// </summary>
+    internal static void StopLoop()
+    {
+        lock (_audioGate)
+        {
+            _loopPending = false;
+            _cycleLoop?.Stop();
+            _cycleLoop = null;
+        }
+    }
 
     /// <summary>
     /// Warm up ahead of the first real use, called every Tick until done: validates the
@@ -103,10 +130,14 @@ internal static class ModAudio
     }
 
     /// <summary>
-    /// Stop the activation sound only (it outlives a quick exit). Other sounds — ours and
-    /// other mods' — keep playing: each owns its own waveOut handle.
+    /// Stop the mode's own sounds (activation sting + marking loop). Other sounds — ours
+    /// and other mods' — keep playing: each owns its own waveOut handle.
     /// </summary>
-    internal static void Stop() => _background?.Stop();
+    internal static void Stop()
+    {
+        _background?.Stop();
+        StopLoop();
+    }
 
     private static void Play(bool enter)
     {
@@ -124,13 +155,24 @@ internal static class ModAudio
                 return;
 
             byte[] pcm = volume < 0.999f ? Scale(clip.Pcm, volume) : clip.Pcm;
-            var playback = Playback.Start(pcm, clip.Format);
 
             if (enter)
             {
-                _background?.Stop(); // a re-entry replaces the previous activation sound
-                _background = playback;
+                // Arm the chain BEFORE the sting starts: when the sting finishes naturally
+                // its playback thread calls StartCycleLoop. A re-entry replaces the previous
+                // sting and any loop still running from it.
+                lock (_audioGate)
+                {
+                    _loopPending = true;
+                    _background?.Stop();
+                    _cycleLoop?.Stop();
+                    _cycleLoop = null;
+                }
             }
+
+            var playback = Playback.Start(pcm, clip.Format, onDone: enter ? StartCycleLoop : null);
+            if (enter)
+                _background = playback;
         }
         catch (Exception ex)
         {
@@ -143,6 +185,54 @@ internal static class ModAudio
         if (enter)
             return _enterClip ??= Decode(_enterPath!);
         return _markClip ??= Decode(_markPath!);
+    }
+
+    /// <summary>
+    /// Called on the sting's playback thread when the sting finishes naturally: while the
+    /// mode is still marking (_loopPending), the cycle clip starts on its own waveOut
+    /// handle and repeats (WHDR_LOOP) until StopLoop/Stop resets the device. A missing or
+    /// invalid loop file only silences the loop — the mod's other sounds keep working.
+    /// </summary>
+    private static void StartCycleLoop()
+    {
+        if (!_ready && !Prepare())
+            return;
+
+        lock (_audioGate)
+        {
+            if (!_loopPending || _cycleLoop != null)
+                return; // marking already over, or a loop is somehow already running
+        }
+
+        try
+        {
+            float volume = UnityEngine.Mathf.Clamp(DeadEyeMod.Settings?.SoundVolume ?? 1f, 0f, 1f);
+            if (volume <= 0.001f)
+                return; // silent setting — the sting was silent too, keep it consistent
+
+            if (_cyclePath == null)
+                return; // warned once in Prepare
+            _cycleClip ??= Decode(_cyclePath);
+            if (_cycleClip == null)
+                return;
+
+            byte[] pcm = volume < 0.999f ? Scale(_cycleClip.Pcm, volume) : _cycleClip.Pcm;
+            var playback = Playback.Start(pcm, _cycleClip.Format, loop: true);
+            lock (_audioGate)
+            {
+                if (!_loopPending)
+                {
+                    playback.Stop(); // the mode ended while the clip was being loaded
+                    return;
+                }
+                _cycleLoop = playback;
+            }
+            ModLog.Info("marking loop started");
+        }
+        catch (Exception ex)
+        {
+            ModLog.Error($"loop playback failed: {ex.Message}");
+        }
     }
 
     private static CachedClip? Decode(string path)
@@ -199,6 +289,12 @@ internal static class ModAudio
             if (_enterPath == null || _markPath == null)
                 return Fail($"missing or invalid WAV in {dir} (expected {EnterFileName} / {MarkFileName})");
 
+            // The loop file is OPTIONAL (added in 0.7.24): an updated dll without the new
+            // wav must not lose the sting and the mark chime, so a miss only warns.
+            _cyclePath = Validate(Path.Combine(dir, CycleFileName));
+            if (_cyclePath == null)
+                ModLog.Warn($"loop file {CycleFileName} missing or invalid in {dir} — the marking loop stays silent");
+
             _ready = true;
             ModLog.Info("sound effects ready (waveOut, Mods/DeadEye/Asset)");
             return true;
@@ -249,10 +345,10 @@ internal static class ModAudio
         private IntPtr _data;
         private volatile bool _stopped;
 
-        internal static Playback Start(byte[] pcm, WaveFormatEx format)
+        internal static Playback Start(byte[] pcm, WaveFormatEx format, Action? onDone = null, bool loop = false)
         {
             var playback = new Playback();
-            var thread = new Thread(() => playback.Run(pcm, format))
+            var thread = new Thread(() => playback.Run(pcm, format, onDone, loop))
             {
                 IsBackground = true,
                 Name = "DeadEyeAudio",
@@ -276,7 +372,7 @@ internal static class ModAudio
             }
         }
 
-        private void Run(byte[] pcm, WaveFormatEx format)
+        private void Run(byte[] pcm, WaveFormatEx format, Action? onDone, bool loop)
         {
             try
             {
@@ -292,6 +388,14 @@ internal static class ModAudio
                 int headerSize = Marshal.SizeOf<WaveHdr>();
                 _header = Marshal.AllocHGlobal(headerSize);
                 var header = new WaveHdr { Data = _data, BufferLength = (uint)pcm.Length };
+                if (loop)
+                {
+                    // Device-side looping: the buffer replays by itself until waveOutReset,
+                    // so the gap between repeats stays at zero — no watcher-driven restart.
+                    // BOTH boundary flags are required or the device ignores dwLoops.
+                    header.Flags |= WhdrBeginLoop | WhdrEndLoop;
+                    header.Loops = uint.MaxValue;
+                }
                 Marshal.StructureToPtr(header, _header, false);
 
                 waveOutPrepareHeader(_handle, _header, headerSize);
@@ -304,6 +408,11 @@ internal static class ModAudio
                         break;
                     Thread.Sleep(20);
                 }
+
+                // Natural end only — a Stop() must not fire the chain (e.g. into the
+                // execution): the flag above is already set by Stop before the reset.
+                if (onDone != null && !_stopped)
+                    onDone();
             }
             catch (Exception ex)
             {
