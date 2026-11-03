@@ -1,5 +1,30 @@
 # ChangeLog
 
+## 0.7.30
+
+- **Fixed: the hard tint edge after the scratch head left the screen** (both user reports from the 17-40-33 capture). Root cause found by pixel-measuring the recording: the solid tint rect was `[headX, headX+W]` unclamped — once headX went negative (right-to-left sweeps, last third of the motion) its right end fell INSIDE the screen, exposing an untinted region behind a perfectly straight edge that swept leftward ("a part of the screen reverts to the real look, then the full yellow arrives"), while the gradient rode off-screen with the head, unable to soften it. The rect is now intersected with the screen bounds, so the tint always covers everything the head has crossed, all the way to the sweep's end — the canvas handoff is seamless.
+- **The front boundary fade is now perceptible.** Pixel measurement showed the gradient WAS rendering (B channel 199→167 across it) but a linear alpha ramp's low half is invisible over bright snow, so it read as a line. The gradient curve is now sqrt (rises fast near the head) and the soft zone widened to 18% of the screen width.
+
+## 0.7.29
+
+- **Scratch wipe polish from the second live capture** (刮屏特效测试2.mkv): the geometry fix held — the tint boundary rides the head in both directions and the streak is visible for ~0.33 s in near-linear motion. Three look refinements against the reference:
+  - The tint boundary is softer: the gradient straddling the head widened from 8% to 14% of the screen width, so the sepia-to-normal transition reads as a wash instead of a straight seam.
+  - The tail is sparser (tail envelope 0.6 → 0.45, vertical-mask floor 0.20 → 0.15), letting the world show through the wisps instead of a full-screen haze.
+  - The whole streak fades to 60% alpha by the end of the sweep, so the wisps behind the head dissipate like the reference instead of hanging until the tail exits.
+
+## 0.7.28
+
+- **Scratch wipe fixes from the first live capture** (刮屏特效测试1.mkv, R2L direction):
+  - **Bug: the tint region was mirrored wrong.** `DrawTintBehindHead` consumed the travelled distance instead of the screen-space head position, so on right-to-left sweeps the screen was tinted from the wrong edge at the start and a stray yellow band floated ahead of the head. Both directions now derive a screen-space headX and tint strictly behind it (L2R `[0, headX]`, R2L `[headX, W]`), with the soft gradient straddling the head line on the correct side. The streak rect had the same class of bug on R2L and is fixed too.
+  - **The tail now reads as horizontal wisps.** Streak variation moved from per-column (rendered as vertical blinds after the full-height stretch) to per-row.
+  - **Visible crossing slowed to reference pace**: 0.45 s with strong ease-out showed the bright head for only ~0.12 s; now 0.6 s with near-linear motion (~0.2 s of bright head, matching the clip's ~0.27 s), and the vertical mask floor lowered so the streak reads less like a light pillar.
+
+## 0.7.27
+
+- **The activation scratch wipe was reworked to match the reference frame-by-frame** (10.65-10.92 s of the clip). Two structural changes from the first take:
+  - **The tint boundary now rides with the scratch head.** The canvas tint no longer pops on globally at activation: while the sweep runs, the tint is drawn in OnGUI only behind the head (solid up to the head line, a soft gradient straddling it), so the world the scratch has crossed is already tinted and the world ahead is still normal — the canvas fades in when the sweep completes.
+  - **The streak is a comet, not a band.** The texture alpha is now a vertical Gaussian hugging the lower-middle of the frame times a hot round head cloud plus a feathery tail (column streaks, torn gaps, grain, wavy head line), replacing the uniform full-height strip. Sweep tightened to ~0.45 s.
+
 ## 0.7.26
 
 - **New visual: the activation scratch wipe.** Entering Dead Eye now sweeps a bright, feathery white streak horizontally across the whole screen in ~0.5 s (unscaled), starting from a random side — modelled on the RDR2 activation (reference clip 10-11 s: hot head, torn streaky tail, warm tone settling behind it). It runs while the draw reveal plays and finishes even if the mode is cancelled immediately.

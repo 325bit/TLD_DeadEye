@@ -17,6 +17,25 @@ internal static class Overlay
     private static float _messageUntil;
 
     private static Texture2D? _whiteTex;
+    private static bool _tintSuppressed; // scratch sweep owns the tint split while true
+
+    /// <summary>Solid white 4x4, shared by markers and the scratch sweep's tint rects.</summary>
+    internal static Texture2D WhiteTex
+    {
+        get
+        {
+            if (_whiteTex == null)
+            {
+                _whiteTex = new Texture2D(4, 4, TextureFormat.RGBA32, false);
+                var fill = new Color32(255, 255, 255, 255);
+                for (int y = 0; y < 4; y++)
+                    for (int x = 0; x < 4; x++)
+                        _whiteTex.SetPixel(x, y, fill);
+                _whiteTex.Apply();
+            }
+            return _whiteTex;
+        }
+    }
 
     internal static void SetOverlay(bool enabled)
     {
@@ -30,10 +49,28 @@ internal static class Overlay
         EnsureCanvas();
         if (_canvas != null && _image != null)
         {
-            float opacity = Mathf.Clamp01(DeadEyeMod.Settings?.OverlayOpacity ?? 0.22f);
-            _image.color = new Color(1f, 0.82f, 0.15f, opacity);
+            ApplyTintColor();
             _canvas.SetActive(true);
         }
+    }
+
+    /// <summary>
+    /// While the activation scratch sweeps, the split tint is drawn in OnGUI behind the
+    /// scratch head; the canvas tint must stay invisible until the sweep hands back.
+    /// </summary>
+    internal static void SetTintSuppressed(bool suppressed)
+    {
+        _tintSuppressed = suppressed;
+        if (_image != null)
+            ApplyTintColor();
+    }
+
+    private static void ApplyTintColor()
+    {
+        if (_image == null)
+            return;
+        float opacity = Mathf.Clamp01(DeadEyeMod.Settings?.OverlayOpacity ?? 0.22f);
+        _image.color = new Color(1f, 0.82f, 0.15f, _tintSuppressed ? 0f : opacity);
     }
 
     internal static void SetMessage(string message, float seconds)
@@ -79,15 +116,7 @@ internal static class Overlay
         if (DeadEyeManager.State == DeadEyeState.Inactive)
             return;
 
-        if (_whiteTex == null)
-        {
-            _whiteTex = new Texture2D(4, 4, TextureFormat.RGBA32, false);
-            var fill = new Color32(255, 255, 255, 255);
-            for (int y = 0; y < 4; y++)
-                for (int x = 0; x < 4; x++)
-                    _whiteTex.SetPixel(x, y, fill);
-            _whiteTex.Apply();
-        }
+        _ = WhiteTex; // ensure the shared solid-white texture exists for the marker bars
 
         var camera = GameManager.GetMainCamera();
         if (camera != null)
