@@ -18,7 +18,7 @@ internal static class AnimalBody
     internal const float PreyMinAimHeight = 0.06f;
 
     /// <summary>Used when the settings panel is not built yet (first frame / menu).</summary>
-    private const float DefaultPreyAimFraction = 0.6f;
+    private const float DefaultPreyAimFraction = 0.7f;
 
     /// <summary>Height clamps for large animals, taken from the tested deer behaviour.</summary>
     internal const float LargeMinAimHeight = 0.40f;

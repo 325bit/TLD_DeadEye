@@ -24,7 +24,7 @@ internal static class PlayerAnimSpeedPatch
                 return;
 
             float scale = DeadEye.Core.TimeScaler.Value;
-            float rate = Mathf.Max(1f, DeadEyeMod.Settings?.FireRateMultiplier ?? 1f);
+            float rate = Mathf.Max(1f, DeadEyeMod.Settings?.FireRateMultiplier ?? 1.5f);
             if (scale >= 0.99f && rate <= 1f)
                 return; // nothing to compensate and no rapid fire: leave the game's own value
 
@@ -266,3 +266,26 @@ internal static class AdaptiveProjectileRedirectPatch
         }
     }
 }
+
+/// <summary>
+/// Draw-animation swap (see <see cref="Core.LoadedDraw"/>): the game decides which revolver
+/// draw to play by writing the animator bool `IsLoaded` from the cylinder's round count a few
+/// instructions before it fires the equip trigger. Overwriting that value here lands after the
+/// game's write and before the Animator evaluates the transition; the switch itself never
+/// changes, so nothing about ammo, firing or reloading is affected.
+/// </summary>
+[HarmonyPatch(typeof(PlayerAnimation), nameof(PlayerAnimation.Trigger_Generic_Equip))]
+internal static class EquipDrawPatch
+{
+    private static void Postfix(PlayerAnimation __instance, GearItem gearItem)
+        => Core.LoadedDraw.OnEquipTriggered(__instance, gearItem);
+}
+
+/// <summary>The draw's own completion event — where the animator gets the real value back.
+/// Private in the game, public in the Il2CppInterop stub.</summary>
+[HarmonyPatch(typeof(PlayerAnimation), "OnAnimationEvent_Generic_Equip_Complete")]
+internal static class EquipDrawCompletePatch
+{
+    private static void Postfix(PlayerAnimation __instance) => Core.LoadedDraw.OnEquipComplete(__instance);
+}
+

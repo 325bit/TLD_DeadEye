@@ -134,7 +134,7 @@ internal static class DeadEyeManager
 
         // Steer any bullet that is still chasing its mark. Runs in every state: a shot can
         // still be in the air after the sequence has ended.
-        HomingSteering.Tick(DeadEyeMod.Settings?.HomingStrength ?? 1f);
+        HomingSteering.Tick(DeadEyeMod.Settings?.HomingStrength ?? 0.5f);
 
         // Warm the audio subsystem up during normal gameplay, long before the first
         // activation — the first winmm sound a process issues would otherwise be swallowed.
@@ -380,7 +380,7 @@ internal static class DeadEyeManager
         // member that actually binds under rapid fire — the measured rate-4 session saw a
         // 0.52 s median gap with the other members compressed to 0.12 s — so at rate > 1
         // it is overridden; rate 1 keeps it and restores the vanilla pace exactly.
-        float rate = Mathf.Max(1f, DeadEyeMod.Settings?.FireRateMultiplier ?? 1f);
+        float rate = Mathf.Max(1f, DeadEyeMod.Settings?.FireRateMultiplier ?? 1.5f);
         bool pacingOpen = Time.unscaledTime >= _nextShotUnscaled &&
                           (rate > 1f || !shooter.IsReloadCooldownActive);
 
@@ -496,12 +496,12 @@ internal static class DeadEyeManager
     }
 
     /// <summary>
-    /// The launch speed a Dead Eye round actually flies at. The world runs at
-    /// <see cref="Time.timeScale"/> during the execution, so a bullet at the table speed looks
-    /// 1/scale times slower than a normal shot; the speed is raised by exactly that factor — and
-    /// capped at <see cref="HomingSteering.MaxCoveredSpeed"/>, because beyond it the swept hit
-    /// test can no longer sample the whole segment and would start missing animals it flies
-    /// through. The lead prediction MUST use this same value or every shot misses by the ratio.
+    /// The launch speed a Dead Eye round actually flies at. The world runs at the OWNED scale
+    /// (<see cref="TimeScaler.Value"/>, never the readback a prefix writer can stomp — §10 #1),
+    /// so a bullet at the table speed looks 1/scale times slower than a normal shot; the speed
+    /// is raised by exactly that factor, capped at <see cref="HomingSteering.MaxCoveredSpeed"/>,
+    /// because beyond it the swept hit test cannot sample the whole segment and would miss.
+    /// The lead prediction MUST use this value too or every shot misses by the ratio.
     /// </summary>
     private static float CompensatedLaunchSpeed(string? gunName)
     {
@@ -509,7 +509,7 @@ internal static class DeadEyeManager
         if (baseSpeed < 1f)
             return baseSpeed;
 
-        float scale = Mathf.Clamp(Time.timeScale, 0.05f, 1f);
+        float scale = Mathf.Clamp(TimeScaler.Value, 0.05f, 1f);
         float wanted = 1f / scale;
         float ceiling = Mathf.Max(1f, HomingSteering.MaxCoveredSpeed / baseSpeed);
         float applied = Mathf.Max(1f, Mathf.Min(wanted, ceiling));
@@ -616,7 +616,7 @@ internal static class DeadEyeManager
     {
         // Bullet time is KEPT through the firing phase, at its own (milder) pace: the
         // yellow filter persists and the time scale lerps from the marking value to
-        // ExecutionTimeScale (default 0.8). Only the player is compensated back toward
+        // ExecutionTimeScale (0.2). Only the player is compensated back toward
         // real time (first-person Animator + unscaled fire pacing, see TickFiring).
         var settings = DeadEyeMod.Settings!;
         _awaitingDraw = false; // the draw phase never survives into the execution
@@ -894,7 +894,7 @@ internal static class DeadEyeManager
         if (!expired && !drifted)
             return remainingDeg; // active glide still healthy — let it run
 
-        if (remainingDeg <= ArrivedDeg * Mathf.Max(1f, DeadEyeMod.Settings?.FireRateMultiplier ?? 1f))
+        if (remainingDeg <= ArrivedDeg * Mathf.Max(1f, DeadEyeMod.Settings?.FireRateMultiplier ?? 1.5f))
         {
             // Parked on the target already: issuing a 0-degree glide would only burn a
             // dead frame. Just re-arm the endpoint bookkeeping so drift stays meaningful.

@@ -33,7 +33,7 @@ public class DeadEyeMod : MelonMod
             LoggerInstance.Error("settings init failed, using built-in defaults: " + ex);
         }
 
-        LoggerInstance.Msg($"{BuildInfo.GUIName} {BuildInfo.Version} loaded");
+        LoggerInstance.Msg($"{BuildInfo.GUIName} {BuildInfo.Version} loaded ({BuildInfo.BuildKind} build)");
 
         try
         {
@@ -120,6 +120,15 @@ public class DeadEyeMod : MelonMod
         {
             LoggerInstance.Error("state tick failed: " + ex);
             DeadEyeManager.ForceExit("tick exception");
+        }
+
+        try
+        {
+            LoadedDraw.Tick();
+        }
+        catch (Exception ex)
+        {
+            LoggerInstance.Error("draw animation tick failed: " + ex);
         }
     }
 

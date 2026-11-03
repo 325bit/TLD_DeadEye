@@ -1,5 +1,20 @@
 # ChangeLog
 
+## 0.7.13
+
+- **New setting: 拔枪动作替换 (on by default).** Every revolver draw now plays the wide "loaded cylinder" animation — the one that sweeps in from the lower right — even when the cylinder is empty; vanilla plays a shorter raise from the bottom for an empty revolver. It covers all four revolvers and every way of drawing one, including the automatic draw when the mode starts, and it can be switched off in the settings page.
+- **How it works.** The choice is not a C# branch between clips: `PlayerAnimation.Trigger_Generic_Equip` computes `IsLoaded = GunItem.NumRoundsInClip() > 0` and writes that Animator bool a few instructions before it fires the equip trigger, and the controller picks the clip from it. The mod overwrites that single value from a postfix (after the game's write, before the Animator evaluates the transition) and returns the real value at the draw's own completion event, with a 6 s fallback for an interrupted draw. `GunItem.Update` does not rewrite the parameter, so one write holds for the whole draw.
+- Cosmetic by construction: the round count, firing, jamming and reloading are never touched; an empty revolver still clicks and still has to be reloaded. Only an empty cylinder is overridden — a loaded one already gets the wanted animation.
+- The merge replaces the standalone `TLD_RevolverDraw.dll`; installing both is harmless but the two would each write the same value, so the setting would no longer be authoritative.
+
+## 0.7.12
+
+- **The tuning knobs are now a debug-build feature and no longer appear in a release build's settings page.** 追踪强度, 小体型瞄准点, 近失补偿半径, 处决时间流速, 处决射速倍率, 进入渐变速度 and 退出渐变速度 are declared `public` with `[Name]`/`[Slider]` inside `#if DEBUG` and plain `internal` otherwise. ModSettings enumerates public instance fields only, so a release dll simply has no control for them — it always plays the tuned values, and a `TLD_DeadEye.json` written by a debug build cannot override them (internal fields are not serialised either). The startup line now prints the configuration: `Dead Eye (死神之眼) 0.7.12 loaded (release build)`.
+- **New tuned defaults, shipped in both builds.** Tracking strength 0.5, small-prey aim point 0.7, near-miss radius 0.5 m, execution time scale 0.2, execution fire-rate multiplier 1.5, enter lerp 5, exit lerp 8. Together they make the execution much slower on screen than 0.7.11 while firing faster than the vanilla pace.
+- **The tracking-strength slider now spans what the code accepts.** It was 0.05-10 while `HomingSteering` clamped the value to 0.2-3, so roughly two thirds of the slider did nothing; the range is now 0.2-3 (the clamp is unchanged).
+- **The launch-speed compensation reads the OWNED time scale.** `CompensatedLaunchSpeed` used `Time.timeScale`, which a prefix writer (TimeAccelerator) can stamp back to 1 mid-frame; that would have cancelled the compensation for that shot and sent the round off at the table speed. It now uses `TimeScaler.Value` like every other consumer (constraint #1). This matters far more at the new 0.2 execution scale, where the compensation is 5x.
+- The seven settings are documented in the README under "Tuning (debug builds only)" with their shipped values, and `docs/DEVELOPMENT.md` records the split (§8, §10 #36, §14).
+
 ## 0.7.11
 
 - **The bullets no longer crawl when the execution is slowed right down.** At 处决时间流速 0.1 the world runs ten times slower, so a 300 m/s round covers just 30 m/s of screen distance: a 60 m shot took **2.0 s** of real time to land (the 120 m shot measured 4.05 s). The launch speed is now multiplied by `1 / Time.timeScale`, so a round crosses the gap at a normal-looking pace.
