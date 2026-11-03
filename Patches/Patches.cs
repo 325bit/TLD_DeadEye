@@ -4,6 +4,58 @@ using UnityEngine;
 namespace DeadEye.Patches;
 
 /// <summary>
+/// Input lockout while Dead Eye owns the weapon (marking or execution state): the game
+/// must not react to LMB (fire), RMB (aim) or R (reload) while the mode drives the gun.
+/// Blocked at the concrete gameplay readers of the Hinterland input wrapper
+/// (<c>InputManager.GetKeyDown</c> / <c>GetMouseButtonDown</c> / <c>GetReloadPressed</c>,
+/// plus the fire entry <c>ProcessFireAction</c> as a second fence) — NOT at raw Unity
+/// input, which is exactly what this mod's own toggle/mark/cancel keys read, so the mode
+/// stays controllable. Camera, movement, scroll and every other key are untouched, and
+/// every prefix is a no-op (lets the original run) while the mode is off.
+/// </summary>
+internal static class DeadEyeInputBlock
+{
+    internal static bool Active =>
+        DeadEye.Core.DeadEyeManager.State is DeadEye.Core.DeadEyeState.Marking
+            or DeadEye.Core.DeadEyeState.Firing;
+}
+
+/// <summary>Keyboard path: R (reload) and the mouse buttons some paths read as keys.</summary>
+[HarmonyPatch(typeof(InputManager), nameof(InputManager.GetKeyDown))]
+internal static class BlockGetKeyDownPatch
+{
+    private static bool Prefix(KeyCode key) =>
+        !(DeadEyeInputBlock.Active &&
+          (key == KeyCode.Mouse0 || key == KeyCode.Mouse1 || key == KeyCode.R));
+}
+
+/// <summary>Mouse path: LMB (fire) and RMB (aim).</summary>
+[HarmonyPatch(typeof(InputManager), nameof(InputManager.GetMouseButtonDown))]
+internal static class BlockGetMouseButtonDownPatch
+{
+    private static bool Prefix(int button) =>
+        !(DeadEyeInputBlock.Active && (button == 0 || button == 1));
+}
+
+/// <summary>Reload wrapper (R on desktop bindings, its own gamepad action otherwise).</summary>
+[HarmonyPatch(typeof(InputManager), nameof(InputManager.GetReloadPressed))]
+internal static class BlockReloadPatch
+{
+    private static bool Prefix() => !DeadEyeInputBlock.Active;
+}
+
+/// <summary>
+/// The fire entry itself, called from <c>InputManager.ProcessInput</c> every HUD frame:
+/// even if a fire press slipped through a reader above, the weapon cannot be made to
+/// fire. Private in the game, patched by name like the other private game methods here.
+/// </summary>
+[HarmonyPatch(typeof(InputManager), "ProcessFireAction")]
+internal static class BlockFireActionPatch
+{
+    private static bool Prefix() => !DeadEyeInputBlock.Active;
+}
+
+/// <summary>
 /// Keeps the first-person Animator at real speed while the execution runs slowed down.
 /// `PlayerAnimation.Update` writes the Animator speed itself every frame, so the value set
 /// from the manager tick is overwritten before the Animator is evaluated (live log: at an

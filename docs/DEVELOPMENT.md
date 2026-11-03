@@ -47,7 +47,10 @@ MelonMod.OnUpdate
 Patches
   ├─ InterfaceManager.Update postfix: re-assert the owned time scale (beats prefix writers such as TimeAccelerator)
   ├─ vp_Bullet.Start prefix:   redirect the spawned bullet onto the predicted intercept, zero Accuracy
-  └─ Fatigue.Update postfix:   extra drain while Marking
+  ├─ Fatigue.Update postfix:   extra drain while Marking
+  └─ InputManager prefix x4:   GetKeyDown / GetMouseButtonDown / GetReloadPressed / ProcessFireAction return
+                               "not pressed" for LMB, RMB and R while Marking or Firing (input lockout —
+                               the mode's own keys read raw Unity input and are NOT affected)
 ```
 
 ## 3. Injection points (2.55)

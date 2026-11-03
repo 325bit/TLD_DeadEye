@@ -1,5 +1,10 @@
 # ChangeLog
 
+## 0.7.25
+
+- **Input lockout while the mode is up.** During marking and the execution the game no longer reacts to the left mouse button (fire), the right mouse button (aim) or the reload key R — firing or reloading mid-sequence fought the mod's own look-at glides and fire pacing. Blocked at the Hinterland input wrapper's concrete readers (`InputManager.GetKeyDown`, `GetMouseButtonDown`, `GetReloadPressed`, plus the `ProcessFireAction` entry as a second fence), so raw Unity input is untouched: the mode's own keys keep working, and movement, camera and every other binding are unaffected. All four prefixes are no-ops while the mode is off.
+- 0.7.24 note: the first 0.7.24 build shipped with the loop fix uncompiled (version string still read 0.7.23 in the log — a build-order slip, caught and verified by string-grepping the dll). The loop itself needed `WHDR_BEGINLOOP | WHDR_ENDLOOP` set together; with only the begin flag the device ignored the loop count and played the buffer once. Both are in this build.
+
 ## 0.7.24
 
 - **New sound: the marking loop.** Once the activation sting finishes during the marking phase, a short background loop (`dead-eye-rdr2-cycle.wav`) starts on its own waveOut handle and keeps playing until marking ends. It stops the moment the execution begins (including the auto-fire path), or the mode exits any other way — toggle with no marks, the cancel key, fatigue, weapon stowed, scene change. The activation sting itself still rings out into the execution as before.

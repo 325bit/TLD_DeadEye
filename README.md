@@ -2,7 +2,7 @@
 
 [English](#english) · [中文](#中文)
 
-![version](https://img.shields.io/badge/version-0.7.24-informational)
+![version](https://img.shields.io/badge/version-0.7.25-informational)
 
 ![game](https://img.shields.io/badge/The%20Long%20Dark-2.55-success)
 
@@ -29,6 +29,7 @@ A The Long Dark mod that slows the world down, lets you mark animals like RDR2's
 
 - Press the side mouse button again — time returns to normal, the mod draws your revolver if it was not in hand, and the view swings onto the first mark through the game's own cinematic look-at system. Once the crosshair has swung onto it the sequence opens fire at the weapon's own full rate, one shot per mark, while the view keeps sweeping smoothly from target to target — the swing is paced to the weapon's fire rate, arriving at each mark just as its shot is due.
 - Each projectile is redirected the instant it spawns onto a lead-predicted intercept point — where the animal will be when the shot arrives, computed from its tracked movement and the revolver's launch speed (gravity included) — so head marks hit heads and body marks hit bodies even on running targets. The game's own damage, bleed-out, critical-hit and skill-progress rules all apply unchanged. With AdaptiveArsenal installed the bullet also keeps steering onto the animal during flight — toward where it will BE, not where it was — and cancels its own muzzle error on the first frame, so a slightly-off lead still lands. Grouse and rabbits are the exception: whatever part you mark, the mark is taken on the animal's damageable body (its body capsule, which is where the shot converges) — a body that small dies to any hit, and an aim point sitting on the visible surface puts half of any error outside the animal. Because those collision capsules are several times larger than the models, a mark is refused when the crosshair is not really on the body — a tolerance scaled to the animal's size, not a fixed distance — instead of being planted a body-length above the bird. How deep inside is the compiled aim fraction (a debug build exposes it as the 小体型瞄准点 slider). And the slow motion does not end at the last trigger pull: the execution holds until the LAST bullet is consumed — by a hit, by scenery, or by its own expiry — then time restores. The rounds themselves are sped up by the same factor the world is slowed by, so a shot crosses the gap at a normal-looking pace instead of crawling; the boost is capped at what the hit detection can still follow.
+- While the mode is up — marking or the execution — the left and right mouse buttons and the reload key (R) do nothing: the mod owns the weapon for the duration, and firing, aiming or reloading mid-sequence would fight its own look-at glides and pacing. Movement, the camera, and every other key are unaffected, and the mode's own keys keep working.
 - Fatigue drains a configurable percentage of the full bar per real-time second (default 1%, ~100 s from full), and returns to normal the moment it ends — if you run out of stamina mid-mode, it shuts off by itself, and a fully exhausted survivor cannot enter the mode at all.
 - Footsteps go quiet for as long as you are marking: entering the mode mid-stride no longer leaves the step sounds running under the slow motion. Normal sound returns the moment the mode ends; footprints and splashes are untouched.
 
@@ -141,6 +142,7 @@ MIT — see [LICENSE](LICENSE).
 
 - 再按一次鼠标后侧键——**结束标记环节，直接进入处决**：黄色滤镜与时间放慢一直持续到处决结束（若一个都没标，同一按键则立刻结束死神之眼）。左轮在进入标记时就已经拔出。视角通过游戏自带的过场演出视角系统先甩向第一个标记；准星到位后立刻以武器原生满射速逐个开火，视角在目标之间如「甩枪」般连续平滑掠过——甩动节奏与射速匹配。**放慢只作用于世界：人物自身的拔枪、开火动作与射速都以正常速率进行。**
 - 每发弹丸在出膛瞬间被重定向到**提前量拦截点**——根据动物当前移动速度与左轮出膛速度（含重力下坠）计算「子弹到达时它会在哪」——所以奔跑中的目标也能标头打头、标身打身。游戏自己的伤害、失血、要害判定和技能经验全部原样生效；装了自适应兵工厂时，子弹还会在飞行途中持续修正方向追着它走——追的是「它将要到的地方」而不是「它刚才在的地方」，并且出膛第一帧就抹掉枪口误差——提前量稍有偏差也能命中。松鸡和兔子是例外：无论你标的是哪个部位，标记都取在它的**可伤害身体**上（子弹朝那个胶囊收束）——这么小的目标挨一发就死，而瞄准点如果贴在它可见的表面上，任何偏差都有一半落在身体之外。由于这些碰撞胶囊比模型大好几倍，准星没有真正落在身体上时会**拒绝标记**（容差按动物体型缩放，不是固定距离），而不是把标记点飘到鸟的上方半米处。收进多少由内置的瞄准深度决定（调试版里对应「小体型瞄准点」滑条）。此外，子弹时间不会在最后一枪扣下时就结束——处决效果会一直维持到最后一发子弹消失（命中目标、打在环境上、或自行飞完超时），之后时间才恢复正常。子弹本身也会按世界放慢的倍数加速，所以它划过那段距离的观感接近正常射击，而不是慢吞吞地爬；加速有上限，取命中判定还能跟得上的速度。
+- 模式开启期间——标记或处决——鼠标左键、右键与换弹键（R）全部无效：这把枪整个期间由 mod 接管，中途手动开火、瞄准或换弹都会和它自己的甩枪视角与射击节奏打架。移动、视角和其余按键不受影响，模式自己的几个键也照常可用。
 - 标记期间疲劳按真实时间每秒消耗总量的一定百分比（默认 1%，满疲劳约 100 秒耗空），结束立刻恢复——中途力竭会自动收招，完全力竭时根本进不了模式。
 - 标记期间脚步声静音：走过去随手开启死神之眼，不会再听到慢动作里还在响的脚步。模式一结束声音立刻恢复，脚印与水花不受影响。
 
