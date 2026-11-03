@@ -1,5 +1,10 @@
 # ChangeLog
 
+## 0.7.36
+
+- **Fixed: ironsight aiming still worked during the mode.** The 0.7.25 lockout blocked the fire, reload and generic key paths, but RMB is wired as the game's "alt fire" action: `vp_FPSPlayer.InputZoom` — the weapon-aim state machine and the only caller of `vp_FPSWeapon.CanStartAiming` (found via `find_callers.py` on both `CanStartAiming` variants plus disassembly of the hit) — reads it through `InputManager.GetAltFirePressed / GetAltFire / GetAltFireReleased`, none of which were patched. All three are now blocked while marking or firing, covering every phase of the gesture (press, hold, release) so no partial aim state can start or stick.
+- A practical note from the same investigation: RMB was never read through `GetKeyDown(Mouse1)` or `GetMouseButtonDown(1)` during aiming — the earlier prefixes were correct but simply aimed at paths the aim state machine never walks.
+
 ## 0.7.35
 
 - **New settings: 刮屏白带宽度 (0.15-0.60, default 0.30) and 刮屏扫过时长 (0.3-1.5 s, default 0.6)** under a new 刮屏特效 section — the sweeping band's width and speed are now tunable in-game for live testing instead of being compiled constants.

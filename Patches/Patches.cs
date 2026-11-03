@@ -56,6 +56,33 @@ internal static class BlockFireActionPatch
 }
 
 /// <summary>
+/// The AIM path — the one the 0.7.25 lockout missed. RMB is wired as the game's "alt fire"
+/// action, and <c>vp_FPSPlayer.InputZoom</c> (the weapon-aim state machine, confirmed by
+/// disassembly: it is the only caller of <c>vp_FPSWeapon.CanStartAiming</c>) reads it
+/// through these three wrappers — press edge, hold, release edge. None of the fire or key
+/// paths above touch them, which is why ironsight aiming survived the lockout. Blocking
+/// all three keeps every phase of the aim gesture (press, hold, release) from reaching
+/// InputZoom, so no partial aim state can start or stick.
+/// </summary>
+[HarmonyPatch(typeof(InputManager), nameof(InputManager.GetAltFirePressed))]
+internal static class BlockAltFirePressedPatch
+{
+    private static bool Prefix() => !DeadEyeInputBlock.Active;
+}
+
+[HarmonyPatch(typeof(InputManager), nameof(InputManager.GetAltFire))]
+internal static class BlockAltFireHeldPatch
+{
+    private static bool Prefix() => !DeadEyeInputBlock.Active;
+}
+
+[HarmonyPatch(typeof(InputManager), nameof(InputManager.GetAltFireReleased))]
+internal static class BlockAltFireReleasedPatch
+{
+    private static bool Prefix() => !DeadEyeInputBlock.Active;
+}
+
+/// <summary>
 /// Keeps the first-person Animator at real speed while the execution runs slowed down.
 /// `PlayerAnimation.Update` writes the Animator speed itself every frame, so the value set
 /// from the manager tick is overwritten before the Animator is evaluated (live log: at an
