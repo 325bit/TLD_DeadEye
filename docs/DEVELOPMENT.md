@@ -37,7 +37,7 @@ MelonMod.OnUpdate
   └─ DeadEyeManager.Tick          (state machine, input, guards)
        ├─ TimeScaler.Advance      (unscaled lerp of the OWNED scale; the authoritative push happens in the InterfaceManager.Update postfix)
        ├─ velocity: per mark, ONE `BaseAi.GetVelocity()` read, frozen — uniform-linear lead; a root-position pair over GAME time is logged alongside as a cross-check
-       ├─ Marking:  draw stage (auto-equip + TargetTimeScale) → FocusedTimeScale once the draw window ends; toggle WITH marks → StartFiring (bullet time kept); toggle with no marks → BeginExit (lerp back to 1) → Exiting → Inactive
+       ├─ Marking:  draw stage (auto-equip + TargetTimeScale) → FocusedTimeScale once the draw window ends; cancel key (default Q) → BeginExit (all marks discarded, nothing fired); toggle WITH marks → StartFiring (bullet time kept); toggle with no marks → BeginExit (lerp back to 1) → Exiting → Inactive
        ├─ Exiting:  restore tail shared by the no-marks exit and the end of the firing sequence → lerp back to 1 → Inactive
        └─ Firing:   BULLET TIME KEPT — the yellow filter and the slowdown persist to the end; the first-person Animator is driven at speed = 1/owned scale (real-time player) and the fire pacing runs on UNSCALED time (the scaled m_NextAllowedFireTime gate is neutralized; the interval Fire() pushes is used as-is) so the player fires at the vanilla real rate
                     → one-shot glide #1 (0.55 s EaseOut), then per-segment pursuit glides whose duration = time until the next shot (per phase: mark body → predicted intercept), capped at 400 deg/s; re-issued on expiry or >5 deg drift, start slot pre-advanced one frame

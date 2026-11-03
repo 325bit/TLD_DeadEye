@@ -1,5 +1,10 @@
 # ChangeLog
 
+## 0.7.22
+
+- **New key: 取消标记模式 (default Q).** While the marking phase is up, pressing it discards every mark placed so far and leaves Dead Eye immediately — no shots are fired. It is checked before the toggle key, so a cancel is never swallowed even on the same frame: the toggle with marks starts the execution, the cancel key aborts it outright. Rebindable in the settings page like the other two keys.
+- The empty exit path (toggle with no marks) keeps its previous behaviour and on-screen line; a cancelled session shows 「死神之眼已取消」 and logs how many marks were discarded.
+
 ## 0.7.21
 
 - **Footsteps are silenced while marking.** Entering the mode in mid-stride used to keep the step sounds going under the slow motion. The game has a flag for exactly this (`FootStepSounds.m_SupressFoostepAudio`, tested at the top of its footstep method and used by its own Audio_SuppressFootsteps action), so the mod flips it while the marking state is up and puts back the value it found when the phase ends — a cinematic that set the flag itself is not cleared.

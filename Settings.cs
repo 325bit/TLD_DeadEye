@@ -63,6 +63,10 @@ internal class Settings : JsonModSettings
     [Description("默认鼠标中键。在子弹时间里瞄准一只活物并按下，即可把它标记为射击目标，可重复标记同一目标或标记多个目标。")]
     public KeyCode MarkKey = KeyCode.Mouse2;
 
+    [Name("取消标记模式")]
+    [Description("默认 Q 键。标记模式下按下会立刻放弃所有已打的标记并退出死神之眼，不会开火（切换键在有标记时是进入处决，这个键是直接取消）。")]
+    public KeyCode CancelKey = KeyCode.Q;
+
 #if DEBUG
     [Section("子弹时间")]
 
@@ -96,7 +100,7 @@ internal class Settings : JsonModSettings
 
     [Name("疲劳每秒消耗")]
     [Description("标记模式期间每秒消耗疲劳上限的百分比（按真实时间计），1 = 每秒烧掉总量的 1%，满疲劳约 100 秒耗空。疲劳耗尽时模式自动退出；完全力竭时无法进入死神之眼。")]
-    [Slider(0.5f, 10f)]
+    [Slider(0.0f, 10f)]
     public float FatiguePerSecond = 1f;
 
     [Section("视觉")]

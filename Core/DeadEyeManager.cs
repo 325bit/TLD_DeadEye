@@ -196,6 +196,15 @@ internal static class DeadEyeManager
             ModLog.Info($"revolver revealed, marking speed -> {FocusedMarkingScale:F3}");
         }
 
+        // Explicit cancel (default Q): discard every mark and leave the mode without
+        // firing, even when marks are already placed — the toggle key would have started
+        // the execution instead. Checked before the toggle so a cancel is never eaten.
+        if (KeyPressed(settings.CancelKey))
+        {
+            BeginExit("cancel key");
+            return;
+        }
+
         if (KeyPressed(settings.ToggleKey))
         {
             // With marks: end the marking phase and dive straight into the firing phase —
@@ -204,7 +213,7 @@ internal static class DeadEyeManager
             if (_marks.Count > 0)
                 StartFiring();
             else
-                BeginExit();
+                BeginExit("toggle with no marks");
             return;
         }
 
@@ -601,15 +610,23 @@ internal static class DeadEyeManager
         ModAudio.PlayEnter();
     }
 
-    private static void BeginExit()
+    /// <summary>
+    /// Leave the marking phase without firing (toggle with no marks, or the cancel key).
+    /// The reason only feeds the log; the on-screen line differs so a cancelled session
+    /// with marks on animals is distinguishable from a plain empty exit.
+    /// </summary>
+    private static void BeginExit(string reason)
     {
+        bool cancelled = reason == "cancel key";
+        int discarded = _marks.Count;
         State = DeadEyeState.Exiting;
         Overlay.SetOverlay(false);
         _marks.Clear();
         MarkCap = 0;
         _awaitingDraw = false;
         TimeScaler.LerpTo(1f, DeadEyeMod.Settings!.ExitLerpSpeed);
-        ModLog.Info("Dead Eye exiting (no marks)");
+        ModLog.Info($"Dead Eye exiting ({reason}, {discarded} mark(s) discarded)");
+        Overlay.SetMessage(cancelled ? "死神之眼已取消" : "死神之眼结束", 1.5f);
     }
 
     private static void StartFiring()
