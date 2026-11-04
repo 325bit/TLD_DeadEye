@@ -2,7 +2,7 @@
 
 [English](#english) · [中文](#中文)
 
-![version](https://img.shields.io/badge/version-0.7.36-informational)
+![version](https://img.shields.io/badge/version-0.7.53-informational)
 
 ![game](https://img.shields.io/badge/The%20Long%20Dark-2.55-success)
 
@@ -58,7 +58,7 @@ A The Long Dark mod that slows the world down, lets you mark animals like RDR2's
 ### Usage
 
 1. Carry the revolver selected in the settings (it can stay in your pack).
-2. Press the side mouse button — time slows, the revolver is drawn if it was stowed, the screen turns yellow, and "死神之眼 · 标记目标" appears. The draw speed (0.1x) only lasts the first 0.7 s; the world then drops to the fixed marking speed (0.01x) so the rest of the raise crawls through the whole marking phase.
+2. Press the side mouse button — time slows, the revolver is drawn if it was stowed, and the screen turns yellow. The draw speed (0.1x) only lasts the first 0.7 s; the world then drops to the fixed marking speed (0.01x) so the rest of the raise crawls through the whole marking phase.
 3. Aim at an animal and press the middle mouse button — a red mark appears; repeat up to the mark cap. Reaching the cap starts the execution by itself (switchable off in the settings).
 4. Press the side mouse button again — the marking phase ends and every mark is shot in order. The yellow tint and the slowdown carry through the whole execution, while your own actions (draw, fire rate) run at normal speed. If nothing was marked, the same press ends the mode immediately. Press the cancel key (Q) instead to abort: all marks are discarded and nothing is fired.
 
@@ -85,19 +85,22 @@ Settings live under **Options → Mod Settings → Dead Eye (死神之眼)**.
 
 ### Tuning (debug builds only)
 
-Seven tuning values are **compiled into the release build** and deliberately absent from the settings page, so a shipped dll always plays the way it was tuned:
+Eight tuning values are **compiled into the release build** and deliberately absent from the settings page, so a shipped dll always plays the way it was tuned:
 
 | Value | Release build | What it does |
 |---|---|---|
 | Tracking strength | 0.5 | How hard an in-flight round turns toward its mark |
 | Small-prey aim point | 0.7 | How deep inside a grouse / rabbit the shot converges (0 = feet, 1 = body centre) |
-| Near-miss radius | 0.5 m | A round passing this close to a damage collider counts as a hit |
+| Near-miss radius | 0.6 m | A round passing this close to a damage collider counts as a hit |
+| Mark fallback radius | 1.2 m | How far the crosshair ray may miss an animal's body and still mark it — this is what catches a howling wolf's head, which sticks out above its collision capsule; 0 turns the fallback off |
 | Execution time scale | 0.2 | World speed during the execution |
 | Execution fire rate | 1.5x | How much faster than normal shooting the sequence fires |
 | Enter lerp speed | 5 | How fast time slows down on activation |
 | Exit lerp speed | 8 | How fast time returns to normal afterwards |
 
-A `DEBUG` build of the same version exposes all seven as sliders under 弹道 / 子弹时间, which is the only way to re-tune them in game. The build kind is printed at startup — `Dead Eye (死神之眼) 0.7.12 loaded (release build)` — so a deployed dll can be told apart at a glance. Changes made in a debug build are saved to `Mods/TLD_DeadEye.json` but are ignored by the release build.
+A `DEBUG` build of the same version exposes them all as sliders under 弹道 / 子弹时间, which is the only way to re-tune them in game. The build kind is printed at startup — `Dead Eye (死神之眼) 0.7.12 loaded (release build)` — so a deployed dll can be told apart at a glance. Changes made in a debug build are saved to `Mods/TLD_DeadEye.json` but are ignored by the release build.
+
+A debug build also prints the bottom-centre status line (mark counter, per-mark rejections); the release build draws only the mark Xs themselves. The one exception in both builds is a refusal that happens before the mode starts — exhausted, no bound revolver, empty cylinder — which always shows.
 
 ### Compatibility
 
@@ -113,6 +116,9 @@ First check that the bound revolver is in your pack and its cylinder is not empt
 
 **The marks do not all fire?**  
 A mark on an animal that dies before the sequence reaches it is skipped; shots land at the marked body point, so marks placed on a moving animal's old position follow the animal itself.
+
+**The crosshair sits on the animal but no mark appears?**  
+Some poses put visible fur outside the collision capsule — a howling wolf raises its head above the body box. The mod then marks the nearest live animal whose body lies within 1.2 m of the crosshair ray instead of dropping the click; only when nothing is that close does the click fail.
 
 ### Uninstall
 
@@ -174,7 +180,7 @@ MIT — see [LICENSE](LICENSE).
 ### 使用
 
 1. 携带设置里选定的那把左轮（放背包里也行）。
-2. 按鼠标后侧键——时间放慢；左轮若还在背包里会当场拔出来；画面变黄，屏幕出现「死神之眼 · 标记目标」。前 0.7 秒是 0.1 倍，之后世界固定降到 0.01 倍，剩下的抬枪动作在极慢的流速里贯穿整个标记过程。
+2. 按鼠标后侧键——时间放慢；左轮若还在背包里会当场拔出来；画面变黄。前 0.7 秒是 0.1 倍，之后世界固定降到 0.01 倍，剩下的抬枪动作在极慢的流速里贯穿整个标记过程。
 3. 准星对准动物按鼠标中键——出现红色标记，可一直标到上限。标满上限的瞬间自动进入处决（设置里可关）。
 4. 再按一次鼠标后侧键——结束标记、进入处决；黄滤镜和慢动作持续到处决结束，人物动作保持正常速率。若没有标记，则立刻结束死神之眼。改按取消键（Q）则直接放弃：所有标记作废，不开火退出。
 
@@ -201,19 +207,22 @@ MIT — see [LICENSE](LICENSE).
 
 ### 调参（仅调试版）
 
-下面 7 个调参值是**直接编译进发布版的**，故意不放进设置页——发布出去的 dll 永远按这份调校在跑：
+下面 8 个调参值是**直接编译进发布版的**，故意不放进设置页——发布出去的 dll 永远按这份调校在跑：
 
 | 项 | 发布版取值 | 作用 |
 |---|---|---|
 | 追踪强度 | 0.5 | 飞行中的子弹咬住标记的力度 |
 | 小体型瞄准点 | 0.7 | 打到松鸡 / 兔子体内多深（0 = 脚下，1 = 身体胶囊中心） |
-| 近失补偿半径 | 0.5 米 | 弹道擦到伤害碰撞体这个距离内即算命中 |
+| 近失补偿半径 | 0.6 米 | 弹道擦到伤害碰撞体这个距离内即算命中 |
+| 标记回退半径 | 1.2 米 | 准星射线擦过动物身体多远之内仍算「瞄着它」——专门用来救仰头嚎叫的狼（头部伸出碰撞胶囊之外）这类情况；0 = 关闭回退 |
 | 处决时间流速 | 0.2 | 处决期间的世界流速 |
 | 处决射速倍率 | 1.5 倍 | 处决序列比平时射击快多少 |
 | 进入渐变速度 | 5 | 进入时时间放慢的快慢 |
 | 退出渐变速度 | 8 | 退出时时间恢复的快慢 |
 
-同版本的 **DEBUG** 构建会把它们全部作为滑条放进「弹道 / 子弹时间」分区，这是唯一能在游戏里重新调这 7 项的方式。启动日志会写明构建类型——`Dead Eye (死神之眼) 0.7.12 loaded (release build)`——一眼就能分辨部署的是哪个构建。调试版的调整会存进 `Mods/TLD_DeadEye.json`，但发布版会忽略它。
+同版本的 **DEBUG** 构建会把它们全部作为滑条放进「弹道 / 子弹时间」分区，这是唯一能在游戏里重新调这些值的方式。启动日志会写明构建类型——`Dead Eye (死神之眼) 0.7.12 loaded (release build)`——一眼就能分辨部署的是哪个构建。调试版的调整会存进 `Mods/TLD_DeadEye.json`，但发布版会忽略它。
+
+调试版还会在屏幕下方打一行状态文字（标记计数、每次标记被拒的原因）；发布版只画标记本身的红色叉。两个构建都保留的唯一例外是**进入之前**的拒绝提示——太疲惫、没带绑定的左轮、弹巢没子弹——这类提示照常显示。
 
 ### 兼容性
 
@@ -229,6 +238,9 @@ MIT — see [LICENSE](LICENSE).
 
 **标记没有被全部射出？**  
 轮到它之前动物已经死亡的标记会被跳过；子弹落在标记的身体点上，标在动物身上的标记会跟着动物走。
+
+**准星明明在动物身上却没标记上？**  
+有些姿势会让可见的毛皮伸出碰撞胶囊之外——比如狼仰头嚎叫时，头部整块在身体包围盒上方。这种情况会改为标记「准星射线 1.2 米内最近的活物」，不再直接放弃这次点击；只有附近什么都没有时才会失败。
 
 ### 卸载
 

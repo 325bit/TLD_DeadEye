@@ -44,14 +44,27 @@ internal class Settings : JsonModSettings
     [Description("弹道从标记猎物的伤害碰撞体该距离（米）以内擦过时，按命中结算（0 = 仅精确接触才算）。补偿真实弹头直径与瞄准容错——只要求贴近，不要求正中。0.1-0.2 偏保守，0.6 = 当前调校值；越大越容易把擦身而过算成命中。立刻生效。")]
     [Slider(0f, 1.0f)]
     public float NearMissRadius = DefaultNearMissRadius;
+
+    [Name("标记回退半径")]
+    [Description("准星射线完全没有碰到动物时，允许退而求其次的直线距离（米）：把射线到最近活物体包围盒的距离小于该值的动物认作「准星看着的那只」，再按正常流程定点。用于毛皮伸出碰撞体的情况（例如狼仰头嚎叫时的头部）。0 = 关闭回退；1.2 = 当前调校值（覆盖实测的 0.90 米与 1.14 米）。立刻生效。")]
+    [Slider(0f, 3f)]
+    public float MarkFallbackRadius = DefaultMarkFallbackRadius;
 #else
     internal bool HomingBullets = true;
     internal float HomingStrength = 0.5f;
     internal float PreyAimFraction = 0.7f;
     internal float NearMissRadius = DefaultNearMissRadius;
+    internal float MarkFallbackRadius = DefaultMarkFallbackRadius;
 #endif
 
     internal const float DefaultNearMissRadius = 0.6f;
+
+    /// <summary>
+    /// Release value of the marking fallback radius: the largest ray-to-body distance (metres)
+    /// that still counts as "the crosshair is on that animal". Measured failures were 0.90 and
+    /// 1.14 m, so 1.2 covers both with the smallest margin that keeps neighbours apart.
+    /// </summary>
+    internal const float DefaultMarkFallbackRadius = 1.2f;
 
     [Section("按键")]
 

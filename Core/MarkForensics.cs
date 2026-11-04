@@ -19,6 +19,22 @@ internal static class MarkForensics
     /// <summary>How many nearest live animals the cone scan reports.</summary>
     private const int CandidateCount = 3;
 
+    /// <summary>Raw hits listed per miss before the rest is summarised. A ray across a whole
+    /// valley can touch dozens of colliders and the first few already answer the question.</summary>
+    private const int RawHitCap = 25;
+
+    /// <summary>
+    /// Animals whose FULL collider inventory was already dumped during the current marking
+    /// session. A prefab root that hosts a dozen animals (the `Wildlife` holder) defeats the
+    /// root rule on every single click, so the same dump repeated itself ~90 lines per click;
+    /// the first copy carries all the evidence and the rest is noise. Cleared on entering the
+    /// mode, so a new session always gets a fresh dump.
+    /// </summary>
+    private static readonly HashSet<int> DumpedThisSession = new HashSet<int>();
+
+    /// <summary>Called on entering the marking mode: the next failure dumps in full again.</summary>
+    internal static void BeginSession() => DumpedThisSession.Clear();
+
     /// <summary>Call exactly where <see cref="DeadEyeManager.TryMark"/> gives up with "the ray touched no animal".</summary>
     internal static void LogMiss(Ray ray, RaycastHit[] hits)
     {
@@ -59,6 +75,15 @@ internal static class MarkForensics
             ModLog.Warn($"no-damageable forensics: collect path root='{(root != null ? root.name : "null")}'" +
                         $" baseAiInRoot={rootAiCount} -> {(rootUsed ? "ROOT set" : "BaseAi-object set (root rule defeated)")}");
 
+            // The header and the collect-path line above always print: they are two lines and
+            // they are what separates the two failure shapes. Only the inventory repeats.
+            if (!DumpedThisSession.Add(go.GetInstanceID()))
+            {
+                ModLog.Warn($"no-damageable forensics: inventory for this animal was dumped earlier " +
+                            $"in this mark session — repeat skipped ({Summarize(go)})");
+                return;
+            }
+
             if (root != null)
                 DumpInventory($"transform.root '{root.name}'", root.gameObject);
             if (root == null || !ReferenceEquals(root.gameObject, go))
@@ -68,6 +93,34 @@ internal static class MarkForensics
         {
             ModLog.Warn($"no-damageable forensics itself failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// One-line stand-in for a repeated inventory dump: how many colliders the animal has, how
+    /// many of them are damageable AND enabled (the only ones the resolution accepts), and how
+    /// many are triggers. Those three numbers are what the full dump was being read for.
+    /// </summary>
+    private static string Summarize(GameObject go)
+    {
+        Collider[]? all = TryGet(() => go.GetComponentsInChildren<Collider>(true));
+        if (all == null)
+            return "collider collection FAILED";
+
+        int damageable = 0, enabledDamageable = 0, triggers = 0;
+        foreach (var collider in all)
+        {
+            if (collider == null)
+                continue;
+            if (collider.isTrigger)
+                triggers++;
+            if (!TryGet(() => collider.gameObject.GetComponent<LocalizedDamage>() != null, false))
+                continue;
+            damageable++;
+            if (collider.enabled)
+                enabledDamageable++;
+        }
+
+        return $"{all.Length} collider(s), {damageable} damageable of which {enabledDamageable} enabled, {triggers} trigger(s)";
     }
 
     /// <summary>Every collider under <paramref name="root"/>, enabled or not. One line each,
@@ -114,6 +167,7 @@ internal static class MarkForensics
             return;
         }
 
+        int listed = 0;
         foreach (var hit in hits)
         {
             var collider = hit.collider;
@@ -121,6 +175,12 @@ internal static class MarkForensics
             {
                 ModLog.Warn($"forensics hit @{hit.distance:F1} m: NULL collider");
                 continue;
+            }
+
+            if (listed >= RawHitCap)
+            {
+                ModLog.Warn($"forensics: ... {hits.Length - listed} more hit(s) omitted");
+                break;
             }
 
             var go = collider.gameObject;
@@ -132,6 +192,7 @@ internal static class MarkForensics
                 $"forensics hit @{hit.distance:F1} m: '{go.name}' layer {go.layer} {collider.GetType().Name}" +
                 $" trigger={collider.isTrigger} enabled={collider.enabled} damage={damage}" +
                 $" aiDirect={(direct != null ? "yes" : "no")} aiParent={(inParent != null ? "yes" : "no")}");
+            listed++;
         }
     }
 

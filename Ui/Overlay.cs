@@ -7,6 +7,9 @@ namespace DeadEye.Core;
 /// In-mode visuals: fullscreen yellow filter (Canvas overlay) + OnGUI markers and messages.
 /// The canvas is created lazily and toggled with the mode; markers are drawn by
 /// DeadEyeMod.OnGUI while marking or firing.
+/// The bottom-centre line has two flavours: <see cref="SetNotice"/> is player-facing feedback
+/// that ships in both builds, <see cref="SetMessage"/> is the in-mode status/diagnostic line and
+/// exists only in DEBUG builds (see DEVELOPMENT §8).
 /// </summary>
 internal static class Overlay
 {
@@ -54,7 +57,29 @@ internal static class Overlay
         }
     }
 
+    /// <summary>
+    /// Player-facing one-liner drawn in BOTH builds: used only for the refusals that happen
+    /// BEFORE the mode starts (exhausted, no revolver, empty cylinder), where the click would
+    /// otherwise feel like the key is simply broken.
+    /// </summary>
+    internal static void SetNotice(string message, float seconds)
+    {
+        Store(message, seconds);
+    }
+
+    /// <summary>
+    /// In-mode status line (mark counter, per-mark rejections, phase banners). DEBUG builds only:
+    /// a release build keeps the in-mode HUD down to the marker Xs, because the yellow filter,
+    /// the scratch wipe and the Xs already say what is going on.
+    /// </summary>
     internal static void SetMessage(string message, float seconds)
+    {
+#if DEBUG
+        Store(message, seconds);
+#endif
+    }
+
+    private static void Store(string message, float seconds)
     {
         _message = message;
         _messageUntil = Time.unscaledTime + seconds;
@@ -121,7 +146,8 @@ internal static class Overlay
             }
         }
 
-        // Message + counter, bottom center.
+        // Bottom-centre line. In a release build nothing ever stores a message through
+        // SetMessage, so this block stays empty there and only the marker Xs are drawn.
         if (Time.unscaledTime < _messageUntil && !string.IsNullOrEmpty(_message))
         {
             var style = new GUIStyle(GUI.skin.label)

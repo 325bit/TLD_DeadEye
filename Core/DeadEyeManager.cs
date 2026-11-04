@@ -567,26 +567,28 @@ internal static class DeadEyeManager
         var fatigue = GameManager.GetFatigueComponent();
         if (fatigue != null && fatigue.IsExhausted())
         {
-            Overlay.SetMessage("太疲惫了，无法进入死神之眼", 2.5f);
+            Overlay.SetNotice("太疲惫了，无法进入死神之眼", 2.5f);
             return;
         }
 
         _boundGun = GunResolver.FindCarried();
         if (_boundGun == null)
         {
-            Overlay.SetMessage("身上没有携带绑定的左轮手枪", 2.5f);
+            Overlay.SetNotice("身上没有携带绑定的左轮手枪", 2.5f);
             return;
         }
 
         int rounds = GunResolver.RoundsAvailable(_boundGun);
         if (rounds <= 0)
         {
-            Overlay.SetMessage("左轮里没有子弹，无法标记目标", 2.5f);
+            Overlay.SetNotice("左轮里没有子弹，无法标记目标", 2.5f);
             return;
         }
 
         MarkCap = rounds;
         _marks.Clear();
+        // One full collider dump per animal per session: the entry point is the session boundary.
+        MarkForensics.BeginSession();
         _lastAimPoint = null;
         _aimPointExpiry = 0f;
 
@@ -796,6 +798,8 @@ internal static class DeadEyeManager
             hits[i] = rawHits[i];
         System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
+        // Sorted raw hits: the FIRST collider hit that resolves to a live animal decides the
+        // click — it either becomes a mark or refuses with the crosshair-gate message.
         foreach (var hit in hits)
         {
             var ai = hit.collider.gameObject.layer == 16
@@ -821,41 +825,57 @@ internal static class DeadEyeManager
                 MarkForensics.LogNoDamageable(ai, hit.collider, hit);
                 ModLog.Warn($"mark: nothing damageable resolved on {hit.collider.gameObject.name} " +
                             $"({HomingSteering.DescribeHitbox(hit.collider)}) — using the raw hit point");
-                markPoint = hit.point;
-                miss = 0f;
-                tolerance = 0f;
-                source = $"raw hit on {hit.collider.gameObject.name}";
+                CommitMark(ai, hit.point, 0f, $"raw hit on {hit.collider.gameObject.name}");
+                return;
             }
             // …and the crosshair has to be ON that body, not merely inside the oversized
             // capsule: refusing here is what stops a mark being planted in empty air.
-            else if (miss > tolerance)
+            if (miss > tolerance)
             {
                 Overlay.SetMessage($"准星偏离活物的可伤害部位（偏 {miss:F2} m，容差 {tolerance:F2} m）", 1.5f);
                 return;
             }
 
-            var mark = new Mark(ai, markPoint);
-            _marks.Add(mark);
-            Overlay.SetMessage($"已标记 {_marks.Count}/{MarkCap}", 1.2f);
-            ModAudio.PlayMark();
-            // Triage line: the runtime species decides the aim model (the interop wrapper
-            // only ever reports BaseAi), and the distance between the shot point and the
-            // point the player actually aimed at says whether the model moved the round off
-            // the animal. (A prey body is ~0.2 m wide.)
-            mark.TryGetAimPoint(out Vector3 markAim);
-            ModLog.Debug($"marked {ai.gameObject.name} [{AnimalBody.SpeciesName(ai)}] " +
-                         $"{(mark.IsSmallPrey ? "small prey" : "large animal")}: {source}, " +
-                         $"{(markPoint - ai.transform.position).magnitude:F2} m from root, " +
-                         $"crosshair miss {miss:F2} m, aim {(markAim - markPoint).magnitude:F2} m off it " +
-                         $"(fraction {AnimalBody.PreyAimFraction:F2}), " + AnimalBody.DescribeBody(ai));
-            // Auto-fire: the mark that reaches the cap (= rounds left in the cylinder) is
-            // also the last one the sequence can shoot, so the execution starts by itself
-            // instead of waiting for another toggle press (setting-gated).
-            if (_marks.Count >= MarkCap && DeadEyeMod.Settings!.AutoFireAtCap)
+            CommitMark(ai, markPoint, miss, source);
+            return;
+        }
+
+        // No raw hit resolved to a live animal: on a visible animal this means the fur is wider
+        // than the colliders (a howling wolf's raised head clears the body capsule). Instead of
+        // dropping the click, take the live animal whose body box lies nearest to the ray —
+        // within the fallback radius only, which is what keeps a neighbouring animal in a herd
+        // from being marked.
+        if (MarkFallback.TryFind(ray, hits, out BaseAi? nearAi, out Collider? nearProxy,
+                                 out Vector3 bodyPoint, out float linearMiss, out float nearSpan) &&
+            nearAi != null && nearProxy != null)
+        {
+            string source;
+            Vector3 markPoint;
+            float miss;
+            if (AnimalBody.TryResolveMarkPoint(nearAi, nearProxy, ray, out Vector3 resolvedPoint,
+                                               out float resolvedMiss, out float _, out string resolvedSource))
             {
-                ModLog.Info("mark cap reached, starting the execution automatically");
-                StartFiring();
+                markPoint = resolvedPoint;
+                miss = resolvedMiss;
+                source = $"linear-fallback {linearMiss:F2} m ({resolvedSource})";
             }
+            else
+            {
+                // Same degradation as the hit path, but there is no hit.point here: the box
+                // point nearest the ray stands in for it.
+                markPoint = bodyPoint;
+                miss = linearMiss;
+                source = $"linear-fallback {linearMiss:F2} m (body box point)";
+            }
+
+            // The body-scaled crosshair gate is deliberately NOT re-applied: the fallback radius
+            // already decided this click is on that animal, and the gate (0.4x the body's largest
+            // dimension = 0.60 m on a wolf capsule) is exactly what the measured 0.90 / 1.14 m
+            // near misses exceed. See docs/DEVELOPMENT.md §10 #38.
+            ModLog.Warn($"mark: no raw hit resolved to an animal — linear fallback chose {nearAi.gameObject.name} " +
+                        $"at {nearSpan:F1} m, {linearMiss:F2} m off the ray (radius {MarkFallback.Radius:F2} m), " +
+                        $"source {source}");
+            CommitMark(nearAi, markPoint, miss, source);
             return;
         }
 
@@ -864,6 +884,36 @@ internal static class DeadEyeManager
         // report looks the same. See Core/MarkForensics.cs.
         MarkForensics.LogMiss(ray, hits);
         Overlay.SetMessage("准星处没有活物（射线没碰到动物）", 1.2f);
+    }
+
+    /// <summary>
+    /// Shared tail of every successful mark, whichever gate produced it: store it, tell the
+    /// player, play the confirm chime, log the triage line and auto-fire when the cap is reached.
+    /// </summary>
+    private static void CommitMark(BaseAi ai, Vector3 markPoint, float miss, string source)
+    {
+        var mark = new Mark(ai, markPoint);
+        _marks.Add(mark);
+        Overlay.SetMessage($"已标记 {_marks.Count}/{MarkCap}", 1.2f);
+        ModAudio.PlayMark();
+        // Triage line: the runtime species decides the aim model (the interop wrapper
+        // only ever reports BaseAi), and the distance between the shot point and the
+        // point the player actually aimed at says whether the model moved the round off
+        // the animal. (A prey body is ~0.2 m wide.)
+        mark.TryGetAimPoint(out Vector3 markAim);
+        ModLog.Debug($"marked {ai.gameObject.name} [{AnimalBody.SpeciesName(ai)}] " +
+                     $"{(mark.IsSmallPrey ? "small prey" : "large animal")}: {source}, " +
+                     $"{(markPoint - ai.transform.position).magnitude:F2} m from root, " +
+                     $"crosshair miss {miss:F2} m, aim {(markAim - markPoint).magnitude:F2} m off it " +
+                     $"(fraction {AnimalBody.PreyAimFraction:F2}), " + AnimalBody.DescribeBody(ai));
+        // Auto-fire: the mark that reaches the cap (= rounds left in the cylinder) is
+        // also the last one the sequence can shoot, so the execution starts by itself
+        // instead of waiting for another toggle press (setting-gated).
+        if (_marks.Count >= MarkCap && DeadEyeMod.Settings!.AutoFireAtCap)
+        {
+            ModLog.Info("mark cap reached, starting the execution automatically");
+            StartFiring();
+        }
     }
 
     // ---------------------------------------------------------------- Helpers

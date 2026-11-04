@@ -258,9 +258,11 @@ internal static class AnimalBody
     /// Colliders of ONE animal. The whole transform root is preferred, because a prefab can
     /// hang its damage capsules outside the object that carries `BaseAi` — but only when that
     /// root holds exactly one animal, since a shared holder would otherwise mix flocks together.
+    /// A null <paramref name="hitCollider"/> (no ray hit at all, e.g. the linear fallback) takes
+    /// the `BaseAi` object's own subtree, which is the same set the root rule falls back to.
     /// internal so the failure forensics can re-collect the same set and report what was skipped.
     /// </summary>
-    internal static Collider[]? CollectFor(BaseAi ai, Collider hitCollider)
+    internal static Collider[]? CollectFor(BaseAi ai, Collider? hitCollider)
     {
         try
         {
