@@ -23,8 +23,13 @@ internal class Settings : JsonModSettings
     [Choice("左轮手枪", "猎人的左轮手枪", "护林人的左轮手枪", "典狱长的左轮手枪")]
     public int BoundRevolver = 0;
 
+    [Name("解锁所需的左轮技能等级")]
+    [Description("左轮手枪技能达到这个等级之后才能使用死神之眼")]
+    [Slider(1f, 5f)]
+    public int RequiredRevolverLevel = 3;
+
     [Name("拔枪动作替换")]
-    [Description("开启后左轮的每一次拔枪都用「装弹后」那套幅度更大的动作（从右下方横扫入画），空弹巢也一样；原版空枪是从屏幕下方小幅抬起。纯外观：弹巢里的真实子弹数、射击与装弹逻辑都不受影响。")]
+    [Description("开启后左轮的每一次拔枪都用「装弹后」那套幅度更大（帅）的动作（从右下方横扫入画），不影响正常功能。")]
     public bool ReplaceDrawAnimation = true;
 
 #if DEBUG
@@ -105,7 +110,7 @@ internal class Settings : JsonModSettings
     [Name("进入渐变速度")]
     [Description("进入标记模式时时间流速渐变到目标值的快慢，越大越快。1.5 = 当前调校值。")]
     [Slider(0.5f, 5f)]
-    public float EnterLerpSpeed = 1.5f;
+    public float EnterLerpSpeed = 1.3f;
 
     [Name("退出渐变速度")]
     [Description("退出标记模式时时间流速恢复正常的快慢，越大越快。8 = 当前调校值。")]
@@ -114,7 +119,7 @@ internal class Settings : JsonModSettings
 #else
     internal float ExecutionTimeScale = 0.2f;
     internal float FireRateMultiplier = 1.5f;
-    internal float EnterLerpSpeed = 1.5f;
+    internal float EnterLerpSpeed = 1.3f;
     internal float ExitLerpSpeed = 8f;
 #endif
 

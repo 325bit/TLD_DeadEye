@@ -2,7 +2,7 @@
 
 [English](#english) · [中文](#中文)
 
-![version](https://img.shields.io/badge/version-0.7.56-informational)
+![version](https://img.shields.io/badge/version-0.7.57-informational)
 
 ![game](https://img.shields.io/badge/The%20Long%20Dark-2.55-success)
 
@@ -19,6 +19,7 @@ Brings Red Dead Redemption 2's Dead Eye to The Long Dark.
 ### Features
 
 - Bind a revolver in the settings; while carrying it, press the bound key to enter Dead Eye, mark animals, then press the key again to fire.
+- Choose the revolver skill level that unlocks the mode (1-5, default 1 = unlocked from the first level); below it the toggle does nothing.
 
 ### Requirements
 
@@ -51,6 +52,7 @@ GPL-3.0 — see [LICENSE](LICENSE). A modified version you distribute must also 
 ### 功能
 
 - 在设置菜单里绑定左轮，携带该左轮时快捷键开启死神之眼，标记动物，再按一次死神之眼开枪
+- 设置里可选解锁所需的左轮技能等级（1-5，默认 1 = 一级即可用），没达到时快捷键不生效
 
 ### 前置
 
@@ -65,7 +67,7 @@ GPL-3.0 — see [LICENSE](LICENSE). A modified version you distribute must also 
 
 ### 兼容性
 
-- **与 AdaptiveArsenal 兼容**：自动探测，装不装都能命中标记点。
+- **与 AdaptiveArsenal 兼容**：自动探测，装不装都能命中标记点。推荐安装AdaptiveArsenal。
 - 应该与HuntingRoads的子弹系统不兼容，但可以用它的瞄准镜。
 
 更新记录见 [ChangeLog.md](ChangeLog.md)。

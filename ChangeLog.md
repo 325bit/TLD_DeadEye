@@ -1,5 +1,12 @@
 # ChangeLog
 
+## 0.7.57
+
+- **New setting 解锁所需的左轮技能等级 (`RequiredRevolverLevel`, weapon-binding section, 1-5, default 1).** Dead Eye is now a progression reward: the toggle does nothing until the vanilla revolver skill reaches the configured level, and the entry is refused with a log line (`activation refused: revolver skill 2 < required 3`) instead of silently working. 1 = the starting level, i.e. the old behaviour (nothing to unlock); 5 = only a maxed revolver skill unlocks the mode.
+- **The number is the one the skills page shows.** `Skill.GetCurrentTierNumber()` returns a 0-based tier INDEX — verified in the 2.55 disassembly (0 points -> 0, points at the last threshold -> 4) — so the mod adds 1 before comparing. Levels are the vanilla five, and the setting is clamped into 1-5 whatever the JSON says.
+- **Checked on activation only, before the gear and fatigue refusals.** Skill levels never go down, so a running sequence cannot fall below the threshold; and a low-level player pressing the key is told about the level rather than about a revolver they may well be carrying. A level that cannot be read (no skills manager yet) passes ONLY when the requirement is 1 — a missing read cannot satisfy a real requirement, and it cannot break the default ungated game either.
+- Fixed on `Core/DeadEyeManager.cs` (`TryEnter` + `RevolverSkillUnlocked` / `RevolverSkillLevel`), `Settings.cs`; documented in `docs/DEVELOPMENT.md` §2/§8/§10 #43. `README` badge and `BuildInfo` bumped together (version check in §16).
+
 ## 0.7.56
 
 - **Fixed: the toggle key started Dead Eye inside the ESC menu and the inventory.** The gameplay guard only asked `Panel_HUD.IsEnabled()`, and the HUD stays ENABLED behind the pause menu, the inventory, the container view and every other screen-taking panel — so all of them passed. The toggle key is read from raw Unity input (deliberately: it is the mode's own key, not the game's), so nothing else stopped it either: the mode entered marking, the world dropped into bullet time and the yellow filter painted over a menu.

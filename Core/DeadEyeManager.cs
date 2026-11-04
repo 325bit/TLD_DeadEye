@@ -603,6 +603,19 @@ internal static class DeadEyeManager
     private static void TryEnter()
     {
         var settings = DeadEyeMod.Settings!;
+
+        // Progression gate: the mode stays locked until the vanilla revolver skill reaches the
+        // configured level. Checked BEFORE the gear checks so a low-level player is told about
+        // the level, not about a missing revolver they may well be carrying.
+        if (!RevolverSkillUnlocked(out int skillLevel, out int requiredLevel))
+        {
+            Overlay.SetMessage(skillLevel <= 0
+                ? "读不到左轮手枪技能等级，暂时无法进入死神之眼"
+                : $"左轮手枪技能达到 {requiredLevel} 级后才能使用死神之眼（当前 {skillLevel} 级）", 3f);
+            ModLog.Info($"activation refused: revolver skill {skillLevel} < required {requiredLevel}");
+            return;
+        }
+
         var fatigue = GameManager.GetFatigueComponent();
         if (fatigue != null && fatigue.IsExhausted())
         {
@@ -1158,6 +1171,47 @@ internal static class DeadEyeManager
     }
 
     private static bool KeyPressed(KeyCode? key) => key.HasValue && Input.GetKeyDown(key.Value);
+
+    // ---------------------------------------------------------------- skill gate
+
+    /// <summary>Vanilla skills have five levels: `Skill.m_TierPoints` holds five thresholds.</summary>
+    internal const int VanillaMaxSkillLevel = 5;
+
+    /// <summary>
+    /// The player's revolver skill level as the skills page numbers it (1-5), or 0 when it
+    /// cannot be read (no world yet, no skills manager). `Skill.GetCurrentTierNumber()`
+    /// returns the 0-based tier INDEX — verified on the 2.55 binary: 0 points -> 0, points at
+    /// or above the last threshold -> 4 — so the number the player sees is that index + 1.
+    /// </summary>
+    internal static int RevolverSkillLevel()
+    {
+        try
+        {
+            var skill = GameManager.GetSkillsManager()?.GetSkill(SkillType.Revolver);
+            return skill == null ? 0 : skill.GetCurrentTierNumber() + 1;
+        }
+        catch (System.Exception ex)
+        {
+            ModLog.Warn($"revolver skill unreadable: {ex.GetType().Name}: {ex.Message}");
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Unlock gate: the revolver skill must be at or above the configured level.
+    /// <paramref name="level"/> is the current level (0 = unreadable), <paramref name="required"/>
+    /// the setting clamped into the vanilla 1-5 range. An unreadable level only passes when the
+    /// requirement is 1 — i.e. when the player asked for no gate at all. As soon as a level IS
+    /// required, missing data must not open the gate; but a read failure must also not break the
+    /// default, ungated experience.
+    /// </summary>
+    private static bool RevolverSkillUnlocked(out int level, out int required)
+    {
+        required = Mathf.Clamp(DeadEyeMod.Settings?.RequiredRevolverLevel ?? 1,
+                               1, VanillaMaxSkillLevel);
+        level = RevolverSkillLevel();
+        return level <= 0 ? required <= 1 : level >= required;
+    }
 
     /// <summary>
     /// Names the guard that refuses to run the mode, or null while gameplay is live. The first
