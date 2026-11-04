@@ -53,7 +53,7 @@ internal static class Overlay
         EnsureCanvas();
         if (_canvas != null && _image != null)
         {
-            float opacity = Mathf.Clamp01(DeadEyeMod.Settings?.OverlayOpacity ?? 0.22f);
+            float opacity = Mathf.Clamp01(DeadEyeMod.Settings?.OverlayOpacity ?? Settings.DefaultOverlayOpacity);
             _image.color = new Color(1f, 0.82f, 0.15f, opacity);
             _canvas.SetActive(true);
         }

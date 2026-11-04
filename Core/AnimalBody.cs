@@ -20,9 +20,6 @@ internal static class AnimalBody
     /// <summary>Lower height bound for small prey: low enough that a mark on the feet still hits.</summary>
     internal const float PreyMinAimHeight = 0.06f;
 
-    /// <summary>Used when the settings panel is not built yet (first frame / menu).</summary>
-    private const float DefaultPreyAimFraction = 0.7f;
-
     /// <summary>Height clamps for large animals, taken from the tested deer behaviour.</summary>
     internal const float LargeMinAimHeight = 0.40f;
     internal const float LargeMaxAimHeight = 1.20f;
@@ -48,7 +45,7 @@ internal static class AnimalBody
     internal static float PreyAimFraction
         => Mathf.Clamp(DeadEyeMod.Settings != null
             ? DeadEyeMod.Settings.PreyAimFraction
-            : DefaultPreyAimFraction, 0f, 1f);
+            : Settings.DefaultPreyAimFraction, 0f, 1f);
 
     /// <summary>
     /// Aim point for small prey: part of the way from the animal's root toward the marked

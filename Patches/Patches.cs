@@ -107,7 +107,7 @@ internal static class PlayerAnimSpeedPatch
                 return;
 
             float scale = DeadEye.Core.TimeScaler.Value;
-            float rate = Mathf.Max(1f, DeadEyeMod.Settings?.FireRateMultiplier ?? 1.5f);
+            float rate = Mathf.Max(1f, DeadEyeMod.Settings?.FireRateMultiplier ?? Settings.DefaultFireRateMultiplier);
             if (scale >= 0.99f && rate <= 1f)
                 return; // nothing to compensate and no rapid fire: leave the game's own value
 
@@ -201,7 +201,7 @@ internal static class FatiguePatch
             if (DeadEye.Core.DeadEyeManager.State != DeadEye.Core.DeadEyeState.Marking)
                 return;
 
-            float perSecond = DeadEyeMod.Settings?.FatiguePerSecond ?? 1f;
+            float perSecond = DeadEyeMod.Settings?.FatiguePerSecond ?? Settings.DefaultFatiguePerSecond;
             if (perSecond <= 0f)
                 return;
 

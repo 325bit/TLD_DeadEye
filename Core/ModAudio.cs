@@ -149,7 +149,7 @@ internal static class ModAudio
 
         try
         {
-            float volume = UnityEngine.Mathf.Clamp(DeadEyeMod.Settings?.SoundVolume ?? 1f, 0f, 1f);
+            float volume = UnityEngine.Mathf.Clamp(DeadEyeMod.Settings?.SoundVolume ?? Settings.DefaultSoundVolume, 0f, 1f);
             if (volume <= 0.001f)
                 return; // silent setting
 
@@ -209,7 +209,7 @@ internal static class ModAudio
 
         try
         {
-            float volume = UnityEngine.Mathf.Clamp(DeadEyeMod.Settings?.SoundVolume ?? 1f, 0f, 1f);
+            float volume = UnityEngine.Mathf.Clamp(DeadEyeMod.Settings?.SoundVolume ?? Settings.DefaultSoundVolume, 0f, 1f);
             if (volume <= 0.001f)
                 return; // silent setting — the sting was silent too, keep it consistent
 

@@ -154,7 +154,7 @@ internal static class DeadEyeManager
 
         // Steer any bullet that is still chasing its mark. Runs in every state: a shot can
         // still be in the air after the sequence has ended.
-        HomingSteering.Tick(DeadEyeMod.Settings?.HomingStrength ?? 0.5f);
+        HomingSteering.Tick(DeadEyeMod.Settings?.HomingStrength ?? Settings.DefaultHomingStrength);
 
         // Warm the audio subsystem up during normal gameplay, long before the first
         // activation — the first winmm sound a process issues would otherwise be swallowed.
@@ -426,7 +426,7 @@ internal static class DeadEyeManager
         // member that actually binds under rapid fire — the measured rate-4 session saw a
         // 0.52 s median gap with the other members compressed to 0.12 s — so at rate > 1
         // it is overridden; rate 1 keeps it and restores the vanilla pace exactly.
-        float rate = Mathf.Max(1f, DeadEyeMod.Settings?.FireRateMultiplier ?? 1.5f);
+        float rate = Mathf.Max(1f, DeadEyeMod.Settings?.FireRateMultiplier ?? Settings.DefaultFireRateMultiplier);
         bool pacingOpen = Time.unscaledTime >= _nextShotUnscaled &&
                           (rate > 1f || !shooter.IsReloadCooldownActive);
 
@@ -1076,7 +1076,7 @@ internal static class DeadEyeManager
         if (!expired && !drifted)
             return remainingDeg; // active glide still healthy — let it run
 
-        if (remainingDeg <= ArrivedDeg * Mathf.Max(1f, DeadEyeMod.Settings?.FireRateMultiplier ?? 1.5f))
+        if (remainingDeg <= ArrivedDeg * Mathf.Max(1f, DeadEyeMod.Settings?.FireRateMultiplier ?? Settings.DefaultFireRateMultiplier))
         {
             // Parked on the target already: issuing a 0-degree glide would only burn a
             // dead frame. Just re-arm the endpoint bookkeeping so drift stays meaningful.
@@ -1207,7 +1207,7 @@ internal static class DeadEyeManager
     /// </summary>
     private static bool RevolverSkillUnlocked(out int level, out int required)
     {
-        required = Mathf.Clamp(DeadEyeMod.Settings?.RequiredRevolverLevel ?? 1,
+        required = Mathf.Clamp(DeadEyeMod.Settings?.RequiredRevolverLevel ?? Settings.DefaultRequiredRevolverLevel,
                                1, VanillaMaxSkillLevel);
         level = RevolverSkillLevel();
         return level <= 0 ? required <= 1 : level >= required;
