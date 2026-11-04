@@ -1,5 +1,13 @@
 # ChangeLog
 
+## 0.7.56
+
+- **Fixed: the toggle key started Dead Eye inside the ESC menu and the inventory.** The gameplay guard only asked `Panel_HUD.IsEnabled()`, and the HUD stays ENABLED behind the pause menu, the inventory, the container view and every other screen-taking panel — so all of them passed. The toggle key is read from raw Unity input (deliberately: it is the mode's own key, not the game's), so nothing else stopped it either: the mode entered marking, the world dropped into bullet time and the yellow filter painted over a menu.
+- **The guard now asks whose screen it is.** `InterfaceManager.IsOverlayActiveImmediate()` is added next to the HUD check, plus `uConsole.m_On` and `GameManager.m_IsPaused` (see `docs/DEVELOPMENT.md` §10 #42). The overlay flag is "some cached panel is enabled and calls itself an overlay", and `Panel_Base.IsOverlayPanel()` returns **true** by default while the panels that share the screen with gameplay override it to **false** (`Panel_HUD`, `Panel_Subtitles`, `Panel_SaveIcon`, `Panel_Camera`, `Panel_Actions`, `Panel_TutorialPopup`, `Panel_Loading`, `PopupBase`, both debug panels — verified in the 2.55 disassembly). `Panel_Inventory`, `Panel_PauseMenu`, `Panel_OptionsMenu`, `Panel_Crafting` and the container/harvest views inherit `true`, so they are rejected without a single panel class being listed, and a menu Hinterland adds later is covered for free.
+- **A menu opened mid-mode now ends the mode instead of sitting under it.** Marking and the firing sequence share the same guard, so opening the inventory or the pause menu force-exits: the time scale, the yellow filter and every mark are restored, instead of leaving the world slowed while the player browses. The firing watchdog still runs on its own (its reason is now logged separately from "gameplay lost").
+- **Diagnostics: `activation ignored: <gate>`**, at Info and throttled to one line per 2 s, names the gate that refused (`interface panel open`, `game paused`, `HUD not up`, …). A report of "Dead Eye did nothing" or "Dead Eye opened in my menu" is now answered by the session log without a repro.
+- `README` badge and `BuildInfo` bumped together (version check in §16); the player-facing behaviour is unchanged inside normal gameplay.
+
 ## 0.7.55
 
 - **New setting 屏幕文字提示 (`ShowHudText`, 视觉 section, default OFF).** It switches EVERY text the mode prints along the bottom of the screen: entering / leaving, the mark counter, the cap banner, the execution banners, "nothing alive at the crosshair", and the per-mark refusal reasons. Off = the marker Xs and the yellow filter, nothing else — which is now what a fresh install gets.

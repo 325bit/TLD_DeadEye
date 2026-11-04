@@ -58,6 +58,7 @@ internal static class DeadEyeManager
     private static float _segIssueUnscaled;       // unscaled: when the active pursuit glide was issued
     private static float _nextShotUnscaled;       // unscaled: when the next shot of the sequence may fire
     private static float _nextGateLog;            // unscaled: throttle for the shot-gated diagnostic line
+    private static float _nextBlockedLog;         // unscaled: throttle for the "activation ignored" line
 
     // Velocity measurement for the CURRENT mark. The AI's own velocity is taken as the
     // primary source (it already lives in game seconds); a root-position pair is kept purely
@@ -166,8 +167,17 @@ internal static class DeadEyeManager
                 // Fool-proof: we should never own a modified time scale while inactive.
                 if (TimeScaler.Owned)
                     TimeScaler.ForceRestore();
-                if (IsGameplayActive() && KeyPressed(DeadEyeMod.Settings?.ToggleKey))
-                    TryEnter();
+                if (KeyPressed(DeadEyeMod.Settings?.ToggleKey))
+                {
+                    // The toggle key is read from raw Unity input, so it also fires while the
+                    // pause menu, the inventory or any other panel owns the screen. The guard
+                    // is the ONLY thing that keeps the mode out of those screens.
+                    string? blocked = BlockingReason();
+                    if (blocked == null)
+                        TryEnter();
+                    else
+                        LogIgnoredActivation(blocked);
+                }
                 break;
 
             case DeadEyeState.Marking:
@@ -186,9 +196,9 @@ internal static class DeadEyeManager
 
     private static void TickMarking()
     {
-        if (!IsGameplayActive())
+        if (BlockingReason() is string blocked)
         {
-            ForceExit("gameplay lost");
+            ForceExit($"gameplay lost ({blocked})");
             return;
         }
         if (_boundGun == null || !IsBoundGunStillCarried())
@@ -257,9 +267,14 @@ internal static class DeadEyeManager
 
     private static void TickFiring()
     {
-        if (!IsGameplayActive() || Time.unscaledTime > _sequenceDeadline)
+        if (Time.unscaledTime > _sequenceDeadline)
         {
-            ForceExit("gameplay lost or sequence watchdog");
+            ForceExit("sequence watchdog");
+            return;
+        }
+        if (BlockingReason() is string blocked)
+        {
+            ForceExit($"gameplay lost ({blocked})");
             return;
         }
 
@@ -1144,13 +1159,54 @@ internal static class DeadEyeManager
 
     private static bool KeyPressed(KeyCode? key) => key.HasValue && Input.GetKeyDown(key.Value);
 
-    /// <summary>Gameplay guard: player manager exists and the gameplay HUD is up.</summary>
-    internal static bool IsGameplayActive()
+    /// <summary>
+    /// Names the guard that refuses to run the mode, or null while gameplay is live. The first
+    /// failing gate wins, because it is the one worth reporting.
+    /// </summary>
+    internal static string? BlockingReason()
     {
-        if (GameManager.GetPlayerManagerComponent() == null)
-            return false;
-        if (!InterfaceManager.TryGetPanel<Panel_HUD>(out var hud) || hud == null || !hud.IsEnabled())
-            return false;
-        return true;
+        try
+        {
+            if (GameManager.GetPlayerManagerComponent() == null)
+                return "no player manager";
+            // The gameplay HUD: not a panel test, just the "a world is running" baseline.
+            if (!InterfaceManager.TryGetPanel<Panel_HUD>(out var hud) || hud == null || !hud.IsEnabled())
+                return "HUD not up";
+            // The one that matters: a panel took the screen away from gameplay — the pause
+            // menu (ESC), the inventory, the container view, crafting, the options page. The
+            // game's own overlay flag answers it, so no panel class has to be listed: it is
+            // "some cached panel is enabled and calls itself an overlay", and `Panel_Base`
+            // makes that the DEFAULT (returns true) while the panels that share the screen
+            // with gameplay override it to false (HUD, subtitles, save icon, camera, actions,
+            // tutorial popup, loading). A new Hinterland menu is therefore covered for free.
+            if (InterfaceManager.IsOverlayActiveImmediate())
+                return "interface panel open";
+            if (uConsole.m_On)
+                return "debug console open";
+            if (GameManager.m_IsPaused)
+                return "game paused";
+            return null;
+        }
+        catch (System.Exception ex)
+        {
+            // A half-loaded interface must never let the mode start by accident.
+            return $"guard failed ({ex.GetType().Name})";
+        }
+    }
+
+    /// <summary>Gameplay guard: a world is running and no interface panel owns the screen.</summary>
+    internal static bool IsGameplayActive() => BlockingReason() == null;
+
+    /// <summary>
+    /// The toggle key was pressed outside gameplay (pause menu, inventory, console, pause).
+    /// Logged at Info, throttled: a session log that shows this line plus the gate that refused
+    /// is what turns "Dead Eye opened inside my inventory" into a settled question.
+    /// </summary>
+    private static void LogIgnoredActivation(string blocked)
+    {
+        if (Time.unscaledTime < _nextBlockedLog)
+            return;
+        _nextBlockedLog = Time.unscaledTime + 2f;
+        ModLog.Info($"activation ignored: {blocked}");
     }
 }
