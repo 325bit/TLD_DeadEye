@@ -36,3 +36,6 @@
 /.gitignore
 # Visual Studio
 .vs/
+
+# Release packages (tools/pack_release.py)
+/dist

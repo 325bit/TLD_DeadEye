@@ -252,8 +252,44 @@ dotnet build -c Debug     # tuning build: the tuning sliders appear in Mod Setti
 
 The csproj post-build copies `TLD_DeadEye.dll` to the live install's `Mods/` folder (path defined once in `TLD_DeadEye.csproj`) and to `Release/`, and copies `Asset/*.wav` to `Mods/DeadEye/Asset` / `Release/DeadEye/Asset` (see §15). **Both configurations use the same post-build**, so whichever was built last is what the game will load — build `Release` last before playing a shipped build, or simply rebuild it. Verify with the startup lines of `MelonLoader/Latest.log`: the mod prints `... loaded (release build)` or `... loaded (debug build)`, its version, and the number of patched methods. A release dll must list TWELVE settings (the tuning sections do not exist there); a debug dll lists twenty-three.
 
-## 15. Sound effects
+### Packaging a GitHub release
 
+`tools/pack_release.py` builds the mod and assembles the zip players download; `tools/pack_release.bat`
+is the double-click wrapper around it. Nothing is duplicated in the script — it reads `Version`/`Name`
+from `BuildInfo.cs`, the assembly name, the asset folder name and the live-install path from the csproj,
+and ships `Asset/*.wav` (the `.mp3` sources are left out, see §15). It packs what `bin/<cfg>/` holds,
+not `Release/`, so the old versioned dlls kept there cannot end up in the zip.
+
+```
+python tools/pack_release.py            # dotnet build -c Release, then pack
+python tools/pack_release.py -n         # pack the dll already in bin/Release/ (no build)
+python tools/pack_release.py -c Debug   # tuning build -> TLD_DeadEye_v<ver>-debug.zip
+python tools/pack_release.py --strict   # abort if a version number disagrees
+```
+
+The zip is written to `dist/` (git-ignored) and unpacks to a `Mods` tree, which a player merges into
+the game root:
+
+```
+TLD_DeadEye_v0.7.55/
+  Mods/TLD_DeadEye.dll
+  Mods/DeadEye/Asset/*.wav
+  README.md
+  LICENSE
+```
+
+- **Version check**: `BuildInfo.cs` is authoritative; the README badge and the first `ChangeLog.md`
+  section are compared against it (§16). A disagreement warns by default and fails under `--strict`.
+- **Debug never overwrites release**: a Debug build is written as `...-debug.zip`, and the run prints a
+  banner, because both configurations share one output folder and the sliders must not ship.
+- **Deterministic entries**: the zip is written with `zipfile` and forward-slash arcnames (Windows
+  PowerShell 5.1 `Compress-Archive` writes backslashes, which some extractors and every non-Windows tool
+  reject), and entry timestamps come from the source files — repacking unchanged sources reproduces the
+  same bytes and the same SHA-256.
+- The run ends with the zip path, size, SHA-256, source commit (plus a warning when the tree is dirty)
+  and the `gh release create` line for that exact file.
+
+## 15. Sound effects
 - Two PCM16 WAV files ship in `DeadEye/Asset/` (`dead-eye-rdr2.wav` = activation, ~12.6 s; `dead-eye-mark.wav` = mark confirm, ~0.75 s). The `.mp3` files next to them are the editable sources — re-run ffmpeg (`-acodec pcm_s16le`) after editing an mp3.
 - **Playback goes through `winmm!waveOut`, NOT Unity audio and NOT `PlaySound`.** Both Unity routes are dead in this IL2CPP build: `AudioClip.Create` + `SetData` returns an empty clip (length/frequency/channels all zero) and the `DownloadHandlerAudioClip` constructor is stripped (Method not found) — both proven in TLD_LanternBelt. `PlaySound` was the first workaround, but it has ONE channel per process, so the mark confirm cut the 12.6 s activation sound short. Every sound now opens its own `waveOutOpen` handle (WAVE_MAPPER), writes its whole PCM buffer through a heap-allocated `WAVEHDR` (the header must live in unmanaged memory — the driver keeps the pointer), and a short watcher thread polls `WHDR_DONE` before unpreparing/closing. Handles are independent, so sounds overlap; `ModAudio.Stop` only resets the activation handle it owns, so other mods' sounds are no longer purged either.
 - Volume (the `SoundVolume` setting, default 0.8) is applied by scaling the samples **in memory** while copying (waveOut has no per-buffer gain). The old cached `*_v.wav` siblings are no longer written — existing ones in `Mods/DeadEye/Asset` are inert leftovers.
