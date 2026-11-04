@@ -339,7 +339,9 @@ internal static class AdaptiveProjectileRedirectPatch
                         body, target, DeadEye.Core.DeadEyeManager.PendingHomingBodyOffset,
                         DeadEye.Core.DeadEyeManager.PendingHomingSmallPrey,
                         DeadEye.Core.DeadEyeManager.PendingHomingVelocity,
-                        DeadEye.Core.DeadEyeManager.PendingLaunchSpeed);
+                        DeadEye.Core.DeadEyeManager.PendingLaunchSpeed,
+                        DeadEye.Core.DeadEyeManager.PendingHomingHeadPart,
+                        DeadEye.Core.DeadEyeManager.PendingHomingHeadLocal);
             }
 
             ModLog.Debug("AdaptiveArsenal projectile aimed onto the mark");

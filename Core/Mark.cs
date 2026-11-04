@@ -18,6 +18,8 @@ internal sealed class Mark
     private readonly BaseAi _ai;
     private readonly Vector3 _bodyOffset;
     private readonly bool _smallPrey;
+    private readonly LocalizedDamage? _headPart;
+    private readonly Vector3 _headLocal;
     private float _velocityUnscaled;
 
     internal Vector3 Velocity { get; private set; }
@@ -28,12 +30,28 @@ internal sealed class Mark
     /// <summary>GAME time (scaled) the sample in <see cref="Velocity"/> was taken at.</summary>
     internal float VelocityGameTime { get; private set; }
 
-    internal Mark(BaseAi ai, Vector3 worldPoint)
+    internal Mark(BaseAi ai, Vector3 worldPoint, LocalizedDamage? headPart = null, Vector3? headCentre = null)
     {
         _ai = ai;
         _bodyOffset = worldPoint - ai.transform.position;
         _smallPrey = AnimalBody.IsSmallPrey(ai);
         Velocity = Vector3.zero;
+
+        // The head is stored in the HEAD CAPSULE's own space, not as a world offset: the point
+        // is only used for the hit animation, and a howling / turning wolf moves its head a
+        // third of a metre while the root stays put.
+        _headPart = headPart;
+        if (headPart != null && headCentre.HasValue)
+        {
+            try
+            {
+                _headLocal = headPart.transform.InverseTransformPoint(headCentre.Value);
+            }
+            catch (System.Exception)
+            {
+                _headPart = null;
+            }
+        }
     }
 
     internal BaseAi Ai => _ai;
@@ -46,6 +64,41 @@ internal sealed class Mark
 
     /// <summary>Grouse / rabbit: any hit kills, so the shot is aimed at the animal's axis.</summary>
     internal bool IsSmallPrey => _smallPrey;
+
+    /// <summary>
+    /// The head's own damage table when this mark qualified as a head mark, else null. The
+    /// shot reads THIS table instead of the capsule it happened to touch, so a marked head
+    /// always rolls the head row (see <see cref="RoundResolution"/>).
+    /// </summary>
+    internal LocalizedDamage? HeadPart => _headPart;
+
+    /// <summary>
+    /// Head centre in the head capsule's local space. The projectile carries this instead of a
+    /// world point, so the animation lands on the head as it is when the round arrives.
+    /// </summary>
+    internal Vector3 HeadLocal => _headLocal;
+
+    /// <summary>
+    /// Current world position of the head centre this mark was placed on. Resolved live from
+    /// the head capsule's transform, so the hit animation plays where the head is NOW rather
+    /// than where it was when the trigger was pulled.
+    /// </summary>
+    internal bool TryGetHeadPoint(out Vector3 worldPoint)
+    {
+        worldPoint = default;
+        if (_headPart == null || !IsAlive)
+            return false;
+
+        try
+        {
+            worldPoint = _headPart.transform.TransformPoint(_headLocal);
+            return true;
+        }
+        catch (System.Exception)
+        {
+            return false;
+        }
+    }
 
     internal bool IsAlive => _ai != null && _ai.gameObject != null && _ai.GetAiMode() != AiMode.Dead;
 

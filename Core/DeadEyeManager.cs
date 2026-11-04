@@ -107,6 +107,15 @@ internal static class DeadEyeManager
     internal static bool PendingHomingSmallPrey;
 
     /// <summary>
+    /// Head damage table of a HEAD mark (null otherwise), travelling with
+    /// <see cref="PendingHomingTarget"/> so the round reads the head row instead of the row of
+    /// the capsule it happens to touch. <see cref="PendingHomingHeadLocal"/> is the head centre
+    /// in that capsule's local space, which is where the hit animation is played.
+    /// </summary>
+    internal static LocalizedDamage? PendingHomingHeadPart;
+    internal static Vector3 PendingHomingHeadLocal;
+
+    /// <summary>
     /// The target's velocity (GAME seconds) as measured at the fire moment, which goes with
     /// <see cref="PendingHomingTarget"/> as the steering FALLBACK. In-flight steering re-reads
     /// the live velocity every frame and only falls back to this when the animal is unreadable.
@@ -462,9 +471,12 @@ internal static class DeadEyeManager
         PendingHomingTarget = DeadEyeMod.Settings?.HomingBullets == true ? mark.Ai.gameObject : null;
         PendingHomingBodyOffset = mark.BodyOffset;
         PendingHomingSmallPrey = mark.IsSmallPrey;
+        PendingHomingHeadPart = mark.HeadPart;
+        PendingHomingHeadLocal = mark.HeadLocal;
         PendingHomingVelocity = mark.Velocity;
         shooter.Fire();
         PendingHomingTarget = null; // consumed synchronously by the Fire prefix
+        PendingHomingHeadPart = null;
         // The interval Fire() pushes onto the gate is the vanilla fire rate expressed in
         // SCALED seconds (vanilla always runs at scale 1, so the number IS the real
         // interval). Left alone under the execution slowdown the game would advance only
@@ -801,6 +813,22 @@ internal static class DeadEyeManager
             hits[i] = rawHits[i];
         System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
+        // A head mark changes what EVERY round of the execution reads, so the qualification is
+        // decided once, here, from the same ray the gate used — never re-decided at fire time,
+        // when the animal may have turned its head away.
+        void CommitAs(BaseAi target, Vector3 point, float gateMiss, string src)
+        {
+            LocalizedDamage? headPart = null;
+            Vector3 headCentre = default;
+            if (target != null && HeadPart.TryFind(target, ray, out LocalizedDamage? found, out Vector3 centre))
+            {
+                headPart = found;
+                headCentre = centre;
+            }
+
+            CommitMark(target, point, gateMiss, src, headPart, headCentre);
+        }
+
         // Sorted raw hits: the FIRST collider hit that resolves to a live animal decides the
         // click — it either becomes a mark or refuses with the crosshair-gate message.
         foreach (var hit in hits)
@@ -828,7 +856,7 @@ internal static class DeadEyeManager
                 MarkForensics.LogNoDamageable(ai, hit.collider, hit);
                 ModLog.Warn($"mark: nothing damageable resolved on {hit.collider.gameObject.name} " +
                             $"({HomingSteering.DescribeHitbox(hit.collider)}) — using the raw hit point");
-                CommitMark(ai, hit.point, 0f, $"raw hit on {hit.collider.gameObject.name}");
+                CommitAs(ai, hit.point, 0f, $"raw hit on {hit.collider.gameObject.name}");
                 return;
             }
             // …and the crosshair has to be ON that body, not merely inside the oversized
@@ -839,7 +867,7 @@ internal static class DeadEyeManager
                 return;
             }
 
-            CommitMark(ai, markPoint, miss, source);
+            CommitAs(ai, markPoint, miss, source);
             return;
         }
 
@@ -878,7 +906,7 @@ internal static class DeadEyeManager
             ModLog.Warn($"mark: no raw hit resolved to an animal — linear fallback chose {nearAi.gameObject.name} " +
                         $"at {nearSpan:F1} m, {linearMiss:F2} m off the ray (radius {MarkFallback.Radius:F2} m), " +
                         $"source {source}");
-            CommitMark(nearAi, markPoint, miss, source);
+            CommitAs(nearAi, markPoint, miss, source);
             return;
         }
 
@@ -892,10 +920,14 @@ internal static class DeadEyeManager
     /// <summary>
     /// Shared tail of every successful mark, whichever gate produced it: store it, tell the
     /// player, play the confirm chime, log the triage line and auto-fire when the cap is reached.
+    /// <paramref name="headPart"/> is the animal's head damage table when this click counted as
+    /// a head mark (see <see cref="HeadPart"/>); the mark carries it into the execution, where
+    /// it overrides the table of whatever capsule a round happens to touch.
     /// </summary>
-    private static void CommitMark(BaseAi ai, Vector3 markPoint, float miss, string source)
+    private static void CommitMark(BaseAi ai, Vector3 markPoint, float miss, string source,
+                                   LocalizedDamage? headPart = null, Vector3 headCentre = default)
     {
-        var mark = new Mark(ai, markPoint);
+        var mark = new Mark(ai, markPoint, headPart, headCentre);
         _marks.Add(mark);
         Overlay.SetMessage($"已标记 {_marks.Count}/{MarkCap}", 1.2f);
         ModAudio.PlayMark();
@@ -909,6 +941,17 @@ internal static class DeadEyeManager
                      $"{(markPoint - ai.transform.position).magnitude:F2} m from root, " +
                      $"crosshair miss {miss:F2} m, aim {(markAim - markPoint).magnitude:F2} m off it " +
                      $"(fraction {AnimalBody.PreyAimFraction:F2}), " + AnimalBody.DescribeBody(ai));
+        if (headPart != null)
+        {
+            ModLog.Info($"head mark: '{ai.gameObject.name}' carries the HEAD damage row " +
+                        $"(centre {headCentre.y:F2} m high, {(headCentre - ai.transform.position).magnitude:F2} m from root) — " +
+                        "every round that hits this animal resolves as a head hit");
+            // Only the homing resolver knows about the mark; with homing off the shot is
+            // resolved by the game's own contact callback and the row override cannot apply.
+            if (DeadEyeMod.Settings == null || !DeadEyeMod.Settings.HomingBullets)
+                ModLog.Warn("head mark: homing bullets are OFF, so this mark's head row cannot be applied " +
+                            "(the round is resolved outside Dead Eye)");
+        }
         // Auto-fire: the mark that reaches the cap (= rounds left in the cylinder) is
         // also the last one the sequence can shoot, so the execution starts by itself
         // instead of waiting for another toggle press (setting-gated).

@@ -41,6 +41,8 @@ internal static class HomingSteering
         internal Vector3 SpawnPosition;  // muzzle position at Register: the run the damage falloff is measured on
         internal float AimHeight;
         internal bool SmallPrey;
+        internal LocalizedDamage? HeadPart; // set for a HEAD mark: the row every hit reads
+        internal Vector3 HeadLocal;         // head centre in that capsule's local space
         internal float LaunchSpeed;      // world speed this round must fly at (slow-motion compensated)
         internal bool Resolved;          // the hit was applied by this mod; the round is torn down
         internal string ResolutionReason = "resolved on hit"; // report label: hit vs scenery
@@ -86,7 +88,8 @@ internal static class HomingSteering
     private static readonly List<Entry> _entries = new();
 
     internal static void Register(Rigidbody body, GameObject target, Vector3 bodyOffset, bool smallPrey,
-                                  Vector3 targetVelocity, float launchSpeed)
+                                  Vector3 targetVelocity, float launchSpeed,
+                                  LocalizedDamage? headPart = null, Vector3 headLocal = default)
     {
         float now = Time.unscaledTime;
         var entry = new Entry
@@ -102,6 +105,8 @@ internal static class HomingSteering
             SpawnPosition = body.transform.position,
             AimHeight = AnimalBody.LargeAimHeight(bodyOffset),
             SmallPrey = smallPrey,
+            HeadPart = headPart,
+            HeadLocal = headLocal,
             LaunchSpeed = launchSpeed,
             CreatedAt = now,
             ExpiresAt = now + LifetimeSeconds,
@@ -344,7 +349,8 @@ internal static class HomingSteering
                     entry.Resolved = true;
                     WeaponSource weapon = RoundResolution.WeaponSourceOf(entry.Body);
                     bool damaged = RoundResolution.ApplyDamage(collider, closest, entry.SpawnPosition,
-                                                               weapon, out float damage);
+                                                               weapon, out float damage, entry.HeadPart,
+                                                               HeadPointOf(entry, closest));
                     RoundResolution.SpawnImpactEffects(collider, closest, sweep.normalized);
                     entry.ResolutionReason = damaged ? "resolved on hit" : "ended on undamageable body";
                     if (entry.Body != null)
@@ -589,6 +595,26 @@ internal static class HomingSteering
             : root + Vector3.up * entry.AimHeight;
     }
 
+    /// <summary>
+    /// Where the head reaction is played for a HEAD mark: the head centre as it is NOW, resolved
+    /// from the capsule the mark was placed on. Falls back to the contact point when that
+    /// component has been torn down between the shot and the impact.
+    /// </summary>
+    private static Vector3 HeadPointOf(Entry entry, Vector3 fallback)
+    {
+        if (entry.HeadPart == null)
+            return fallback;
+
+        try
+        {
+            return entry.HeadPart.transform.TransformPoint(entry.HeadLocal);
+        }
+        catch (System.Exception)
+        {
+            return fallback;
+        }
+    }
+
     private static bool BelongsToTarget(Entry entry, Collider collider)
     {
         try
@@ -698,7 +724,8 @@ internal static class HomingSteering
 
                 bool damaged = RoundResolution.ApplyDamage(collider, point, entry.SpawnPosition,
                                                            RoundResolution.WeaponSourceOf(entry.Body),
-                                                           out float damage);
+                                                           out float damage, entry.HeadPart,
+                                                           HeadPointOf(entry, point));
                 RoundResolution.SpawnImpactEffects(collider, point, forward);
                 entry.ResolutionReason = damaged ? "resolved on hit" : "ended on scenery";
                 UnityEngine.Object.Destroy(entry.Body.gameObject);

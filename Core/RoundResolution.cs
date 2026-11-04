@@ -60,9 +60,14 @@ internal static class RoundResolution
     /// Applies the damage pipeline to the collider the round was resolved on. Returns true
     /// when damage was applied (the collider is a damageable body part of a live animal);
     /// false means the round hit scenery or a harmless volume.
+    /// <paramref name="headPart"/> is set for a HEAD mark: the geometry still has to land on a
+    /// damageable capsule, but the numbers (damage scale, bleed-out, critical chance) and the
+    /// hit animation are taken from the head instead of the capsule the round happened to
+    /// touch. Without it the row of that capsule is used, exactly as before.
     /// </summary>
     internal static bool ApplyDamage(Collider collider, Vector3 hitPoint, Vector3 spawnPosition,
-                                     WeaponSource weapon, out float damage)
+                                     WeaponSource weapon, out float damage,
+                                     LocalizedDamage? headPart = null, Vector3 headPoint = default)
     {
         damage = 0f;
         try
@@ -76,14 +81,20 @@ internal static class RoundResolution
             if (ai == null || localized == null)
                 return false;
 
-            float bleedOutMinutes = localized.GetBleedOutMinutes(weapon);
-            float scale = localized.GetDamageScale(weapon);
+            // A head mark reads the HEAD row whatever the round touched; the animation follows
+            // the same component, so a chest contact still plays the head reaction rather than
+            // showing a body-part hit the player did not make.
+            LocalizedDamage data = headPart ?? localized;
+            Vector3 animPoint = headPart != null ? headPoint : hitPoint;
+
+            float bleedOutMinutes = data.GetBleedOutMinutes(weapon);
+            float scale = data.GetDamageScale(weapon);
             float distance = Vector3.Distance(spawnPosition, hitPoint);
             damage = Mathf.Lerp(Damage, MinDamage, Mathf.Clamp01(distance / MaxRange)) * scale;
 
             // AdaptiveArsenal rolls the RIFLE critical-hit table regardless of the gun;
             // kept verbatim so a Dead Eye hit costs the same chance as the same AA shot.
-            if (!ai.m_IgnoreCriticalHits && localized.RollChanceToKill(WeaponSource.Rifle))
+            if (!ai.m_IgnoreCriticalHits && data.RollChanceToKill(WeaponSource.Rifle))
                 damage = float.PositiveInfinity;
 
             if (ai.GetAiMode() != AiMode.Dead)
@@ -95,7 +106,7 @@ internal static class RoundResolution
                     SkillsManager.PointAssignmentMode.AssignOnlyInSandbox);
             }
 
-            ai.SetupDamageForAnim(hitPoint, GameManager.GetPlayerTransform().position, localized);
+            ai.SetupDamageForAnim(animPoint, GameManager.GetPlayerTransform().position, data);
             ai.ApplyDamage(damage, bleedOutMinutes, DamageSource.Player, go.name);
             return true;
         }

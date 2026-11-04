@@ -1,5 +1,12 @@
 # ChangeLog
 
+## 0.7.53
+
+- **Head marks now resolve as head hits.** A mark that qualifies as a head mark (crosshair within 0.35 m of the head capsule, found by `LocalizedDamage.m_BodyPart` rather than by object name) makes EVERY round of that execution read the head row of the damage table — damage scale, bleed-out minutes and the critical-hit roll — and play its hit reaction at the head, whichever capsule the round actually reached. The reason this is needed: shots resolve on the capsule the round passes closest to (in practice the chest), so a mark placed dead centre on a howling wolf's head used to roll the chest row no matter how well it was aimed.
+- **Geometry is not relaxed.** The round still has to resolve on a damageable capsule of that animal; a mark aimed beside it does not become a headshot, and the non-damageable root capsule (five to seven times the model's size) is still not a hit. Small prey is excluded — any hit already kills a grouse or rabbit, so the head row would add nothing.
+- **No new setting.** The 0.35 m qualification radius is compiled into both builds and listed in the README's tuning table. Homing bullets must be on: the override lives in Dead Eye's own hit resolution, and a head mark made with homing off logs a warning instead of failing silently.
+- The head centre travels with the mark in the head capsule's local space, so the hit reaction plays where the head is when the round arrives, not where it was when the trigger was pulled.
+
 ## Unreleased
 
 - **License changed from MIT to GPL-3.0-only.** `LICENSE` now holds the GNU General Public License v3, all 23 source files carry an `SPDX-License-Identifier: GPL-3.0-only` header, and the README badge plus both licence sections were updated. From this release on, anyone distributing a modified Dead Eye must do so under GPL-3.0 with source available. Releases published before the change (0.7.53 and earlier) were released under MIT and remain under MIT — that grant is irrevocable and is explicitly not withdrawn, so no old version is retroactively relicensed.

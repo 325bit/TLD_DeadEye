@@ -29,9 +29,6 @@ internal static class MarkFallback
     /// </summary>
     private const float MinBodyExtent = 0.02f;
 
-    /// <summary>Alternating projection passes for the ray-to-box distance; see <see cref="RayToBoundsDistance"/>.</summary>
-    private const int ProjectionPasses = 3;
-
     /// <summary>
     /// Nearest live animal within <see cref="Radius"/> of <paramref name="ray"/>. Ties go to the
     /// animal nearer the ray origin, so of two equally close to the line the one the player faces
@@ -96,7 +93,7 @@ internal static class MarkFallback
                 if (Vector3.Dot(bounds.center - ray.origin, ray.direction) <= 0f)
                     continue;
 
-                float miss = RayToBoundsDistance(ray, bounds, out float along);
+                float miss = AnimalBody.RayToBoundsDistance(ray, bounds, out float along);
                 if (miss > radius)
                     continue;
                 if (Blocked(blockers, along, set, out Collider? cover, out float coverDistance))
@@ -125,31 +122,6 @@ internal static class MarkFallback
         }
 
         return ai != null && proxy != null;
-    }
-
-    /// <summary>
-    /// Distance from the ray to an axis-aligned box, by alternating projection: project the ray's
-    /// nearest point onto the box, project that box point back onto the ray, repeat. Both sets are
-    /// convex, so a couple of passes converge to the true shortest segment; a ray that starts
-    /// inside the box yields 0. <paramref name="along"/> is the ray parameter of that closest
-    /// point, used to decide whether the animal is behind cover.
-    /// </summary>
-    private static float RayToBoundsDistance(Ray ray, Bounds bounds, out float along)
-    {
-        const float Limit = AnimalBody.MarkRange;
-        float t = Mathf.Clamp(Vector3.Dot(bounds.center - ray.origin, ray.direction), 0f, Limit);
-        float best = float.MaxValue;
-
-        for (int pass = 0; pass < ProjectionPasses; pass++)
-        {
-            Vector3 onRay = ray.origin + ray.direction * t;
-            Vector3 onBox = bounds.ClosestPoint(onRay);
-            best = Mathf.Min(best, Vector3.Distance(onRay, onBox));
-            t = Mathf.Clamp(Vector3.Dot(onBox - ray.origin, ray.direction), 0f, Limit);
-        }
-
-        along = t;
-        return best;
     }
 
     /// <summary>

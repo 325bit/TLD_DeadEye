@@ -325,6 +325,33 @@ internal static class AnimalBody
     }
 
     /// <summary>
+    /// Shortest distance between the ray and an axis-aligned box, by alternating projection:
+    /// project the ray's nearest point onto the box, project that box point back onto the ray,
+    /// repeat. Both sets are convex, so a couple of passes converge to the true shortest
+    /// segment; a ray that starts inside the box yields 0. <paramref name="along"/> is the ray
+    /// parameter of that closest point, which callers use to decide what sits in front of what.
+    /// Shared by the mark fallback (which searches bodies) and the head rule (which measures one).
+    /// </summary>
+    internal static float RayToBoundsDistance(Ray ray, Bounds bounds, out float along)
+    {
+        const int passes = 3;
+        const float limit = MarkRange;
+        float t = Mathf.Clamp(Vector3.Dot(bounds.center - ray.origin, ray.direction), 0f, limit);
+        float best = float.MaxValue;
+
+        for (int pass = 0; pass < passes; pass++)
+        {
+            Vector3 onRay = ray.origin + ray.direction * t;
+            Vector3 onBox = bounds.ClosestPoint(onRay);
+            best = Mathf.Min(best, Vector3.Distance(onRay, onBox));
+            t = Mathf.Clamp(Vector3.Dot(onBox - ray.origin, ray.direction), 0f, limit);
+        }
+
+        along = t;
+        return best;
+    }
+
+    /// <summary>
     /// Union of the enabled, non-trigger colliders under <paramref name="root"/>.
     /// <paramref name="cache"/> is filled once and reused by callers that run per frame;
     /// a cache that yields nothing is dropped so the next call re-collects.
