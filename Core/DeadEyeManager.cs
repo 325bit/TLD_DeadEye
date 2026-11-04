@@ -591,21 +591,21 @@ internal static class DeadEyeManager
         var fatigue = GameManager.GetFatigueComponent();
         if (fatigue != null && fatigue.IsExhausted())
         {
-            Overlay.SetNotice("太疲惫了，无法进入死神之眼", 2.5f);
+            Overlay.SetMessage("太疲惫了，无法进入死神之眼", 2.5f);
             return;
         }
 
         _boundGun = GunResolver.FindCarried();
         if (_boundGun == null)
         {
-            Overlay.SetNotice("身上没有携带绑定的左轮手枪", 2.5f);
+            Overlay.SetMessage("身上没有携带绑定的左轮手枪", 2.5f);
             return;
         }
 
         int rounds = GunResolver.RoundsAvailable(_boundGun);
         if (rounds <= 0)
         {
-            Overlay.SetNotice("左轮里没有子弹，无法标记目标", 2.5f);
+            Overlay.SetMessage("左轮里没有子弹，无法标记目标", 2.5f);
             return;
         }
 

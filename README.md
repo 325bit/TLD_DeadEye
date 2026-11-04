@@ -2,7 +2,7 @@
 
 [English](#english) · [中文](#中文)
 
-![version](https://img.shields.io/badge/version-0.7.54-informational)
+![version](https://img.shields.io/badge/version-0.7.55-informational)
 
 ![game](https://img.shields.io/badge/The%20Long%20Dark-2.55-success)
 
@@ -79,6 +79,7 @@ Settings live under **Options → Mod Settings → Dead Eye (死神之眼)**.
 | 疲劳每秒消耗 | Fatigue drain while marking, as a percentage of the full bar per real-time second; raise it to pay more | 1 |
 | 黄色滤镜 | Fullscreen yellow tint while marking. **Off** leaves the normal colours | On |
 | 滤镜不透明度 | Strength of the yellow tint; 0 equals no tint | 0.22 |
+| 屏幕文字提示 | Prints the mode's messages along the bottom of the screen — entering / leaving, how many targets are marked, the execution, "nothing alive at the crosshair", why a mark was refused. **Off** leaves only the yellow tint and the mark Xs | Off |
 | 刮屏白带宽度 | Width of the white band that sweeps across on activation, as a fraction of screen width | 0.30 |
 | 刮屏扫过时长 | How long the band takes to cross the screen, in seconds; lower is faster | 0.6 |
 | 音效音量 | Volume of the activation and mark sounds; 0 is silent | 0.8 |
@@ -102,7 +103,7 @@ Nine tuning values are **compiled into the release build** and deliberately abse
 
 A `DEBUG` build of the same version exposes them all as sliders under 弹道 / 子弹时间, which is the only way to re-tune them in game. The build kind is printed at startup — `Dead Eye (死神之眼) 0.7.12 loaded (release build)` — so a deployed dll can be told apart at a glance. Changes made in a debug build are saved to `Mods/TLD_DeadEye.json` but are ignored by the release build.
 
-A debug build also prints the bottom-centre status line (mark counter, per-mark rejections); the release build draws only the mark Xs themselves. The one exception in both builds is a refusal that happens before the mode starts — exhausted, no bound revolver, empty cylinder — which always shows.
+The bottom-centre text line is NOT part of that compiled-in list: it is an ordinary setting (屏幕文字提示, off by default) available in both builds, so turn it on there if you want the counter and the refusal reasons.
 
 ### Compatibility
 
@@ -205,6 +206,7 @@ You may use, modify and redistribute Dead Eye, including shipping the unmodified
 | 疲劳每秒消耗 | 标记期间每秒（真实时间）消耗疲劳上限的百分比；调大付出更多 | 1 |
 | 黄色滤镜 | 标记期间全屏黄色滤镜；关掉则保持原色 | 开 |
 | 滤镜不透明度 | 黄色滤镜浓度；0 等于没有滤镜 | 0.22 |
+| 屏幕文字提示 | 在屏幕下方打出模式的所有提示：进入 / 退出、标了几个目标、处决开火、准星下没有活物、标记被拒的原因。**关**则只剩黄色滤镜和标记的红色叉 | 关 |
 | 刮屏白带宽度 | 启动死神之眼时扫过的白色光斑宽度（占屏幕宽度的比例） | 0.30 |
 | 刮屏扫过时长 | 白色光斑扫过全屏所花的时间（秒），越小越快 | 0.6 |
 | 音效音量 | 进入音效与标记音效的音量；0 = 静音 | 0.8 |
@@ -228,7 +230,7 @@ You may use, modify and redistribute Dead Eye, including shipping the unmodified
 
 同版本的 **DEBUG** 构建会把它们全部作为滑条放进「弹道 / 子弹时间」分区，这是唯一能在游戏里重新调这些值的方式。启动日志会写明构建类型——`Dead Eye (死神之眼) 0.7.12 loaded (release build)`——一眼就能分辨部署的是哪个构建。调试版的调整会存进 `Mods/TLD_DeadEye.json`，但发布版会忽略它。
 
-调试版还会在屏幕下方打一行状态文字（标记计数、每次标记被拒的原因）；发布版只画标记本身的红色叉。两个构建都保留的唯一例外是**进入之前**的拒绝提示——太疲惫、没带绑定的左轮、弹巢没子弹——这类提示照常显示。
+屏幕下方的文字提示**不属于**这份编译进发布版的清单：它是两个构建都有的普通设置项（屏幕文字提示，默认关），想要计数和拒绝原因在那里打开即可。
 
 ### 兼容性
 

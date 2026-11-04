@@ -135,6 +135,10 @@ internal class Settings : JsonModSettings
     [Description("黄色滤镜的浓度，0 = 全透明（等于关闭滤镜）。")]
     [Slider(0f, 0.6f)]
     public float OverlayOpacity = 0.22f;
+
+    [Name("屏幕文字提示")]
+    [Description("在屏幕下方用文字打出死神之眼的所有提示：进入/退出、标记了几个目标、处决开火、准星下没有活物、标记被拒的原因等。默认关闭——关闭时只剩标记本身的红色叉和黄色滤镜。")]
+    public bool ShowHudText = false;
 #if DEBUG
     [Section("刮屏特效")]
 
