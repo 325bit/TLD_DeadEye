@@ -1,5 +1,9 @@
 # ChangeLog
 
+## Unreleased
+
+- **License changed from MIT to GPL-3.0-only.** `LICENSE` now holds the GNU General Public License v3, all 23 source files carry an `SPDX-License-Identifier: GPL-3.0-only` header, and the README badge plus both licence sections were updated. From this release on, anyone distributing a modified Dead Eye must do so under GPL-3.0 with source available. Releases published before the change (0.7.53 and earlier) were released under MIT and remain under MIT — that grant is irrevocable and is explicitly not withdrawn, so no old version is retroactively relicensed.
+
 ## 0.7.53
 
 - **The bottom-centre status line is now a debug-build feature.** Release builds draw only the mark Xs: the `死神之眼 · 标记目标（0/6）` banner, the `已标记 n/m` counter, the per-mark refusals with their measured miss and tolerance, and the phase banners are gone from the shipped dll. They were development telemetry — the yellow filter, the scratch wipe and the Xs already tell the player everything they need — and the numeric half of it (`偏 0.42 m，容差 0.55 m`) only means something while tuning.

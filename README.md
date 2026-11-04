@@ -8,7 +8,7 @@
 
 ![loader](https://img.shields.io/badge/MelonLoader-0.7.3-blueviolet)
 
-![license](https://img.shields.io/badge/license-MIT-blue)
+![license](https://img.shields.io/badge/license-GPL--3.0-blue)
 
 ---
 
@@ -130,7 +130,9 @@ See [ChangeLog.md](ChangeLog.md) for version history.
 
 ### License
 
-MIT — see [LICENSE](LICENSE).
+GPL-3.0 — see [LICENSE](LICENSE).
+
+You may use, modify and redistribute Dead Eye, including shipping the unmodified dll as part of a modpack. A modified version you distribute must itself be licensed under GPL-3.0 with its source available. Releases published before the license change (0.7.53 and earlier) were released under MIT and remain under MIT — that grant is not withdrawn.
 
 ---
 
@@ -252,5 +254,6 @@ MIT — see [LICENSE](LICENSE).
 
 ### 许可证
 
-MIT —— 见 [LICENSE](LICENSE)。
-E)。
+GPL-3.0 —— 见 [LICENSE](LICENSE)。
+
+可以自由使用、修改和再分发 Dead Eye，包括把未修改的 dll 原样打包进整合包。但如果分发的是修改版，该版本必须以 GPL-3.0 授权并提供源码。许可证变更之前发布的版本（0.7.53 及更早）是 MIT，那份授权不会被收回。

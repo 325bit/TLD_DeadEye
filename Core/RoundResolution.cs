@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Hemalurgic
+
 using Il2CppTLD.AI;
 using Il2CppTLD.Stats;
 using UnityEngine;
