@@ -2,7 +2,7 @@
 
 [English](#english) · [中文](#中文)
 
-![version](https://img.shields.io/badge/version-0.7.53-informational)
+![version](https://img.shields.io/badge/version-0.7.54-informational)
 
 ![game](https://img.shields.io/badge/The%20Long%20Dark-2.55-success)
 
@@ -30,7 +30,7 @@ A The Long Dark mod that slows the world down, lets you mark animals like RDR2's
 
 - Press the side mouse button again — time returns to normal, the mod draws your revolver if it was not in hand, and the view swings onto the first mark through the game's own cinematic look-at system. Once the crosshair has swung onto it the sequence opens fire at the weapon's own full rate, one shot per mark, while the view keeps sweeping smoothly from target to target — the swing is paced to the weapon's fire rate, arriving at each mark just as its shot is due.
 - Each projectile is redirected the instant it spawns onto a lead-predicted intercept point — where the animal will be when the shot arrives, computed from its tracked movement and the revolver's launch speed (gravity included) — so head marks hit heads and body marks hit bodies even on running targets. The game's own damage, bleed-out, critical-hit and skill-progress rules all apply unchanged. With AdaptiveArsenal installed the bullet also keeps steering onto the animal during flight — toward where it will BE, not where it was — and cancels its own muzzle error on the first frame, so a slightly-off lead still lands. Grouse and rabbits are the exception: whatever part you mark, the mark is taken on the animal's damageable body (its body capsule, which is where the shot converges) — a body that small dies to any hit, and an aim point sitting on the visible surface puts half of any error outside the animal. Because those collision capsules are several times larger than the models, a mark is refused when the crosshair is not really on the body — a tolerance scaled to the animal's size, not a fixed distance — instead of being planted a body-length above the bird. How deep inside is the compiled aim fraction (a debug build exposes it as the 小体型瞄准点 slider). And the slow motion does not end at the last trigger pull: the execution holds until the LAST bullet is consumed — by a hit, by scenery, or by its own expiry — then time restores. The rounds themselves are sped up by the same factor the world is slowed by, so a shot crosses the gap at a normal-looking pace instead of crawling; the boost is capped at what the hit detection can still follow.
-- **A mark placed on the head makes every shot of the execution a head hit.** Once a mark qualifies as a head mark, every round that touches the animal reads the head's row of the damage table — damage scale, bleed-out time and the critical-hit roll — and plays its hit reaction at the head, whichever capsule the round actually reached. The round still has to land on a damageable part of that animal: a mark aimed beside it does not become a headshot. Grouse and rabbits are excluded (any hit already kills them).
+- **A mark placed on the head makes every shot of the execution a head hit — and the shot is aimed at it.** Once a mark qualifies as a head mark, the marker sits on the head centre and every round chases it. If the head's damage capsule cannot be hit at that moment (a howling wolf switches its capsules off), the round is aimed at the body instead so it still lands — and still reads the head's row of the damage table: damage scale, bleed-out time and the critical-hit roll, with the hit reaction played at the head whichever capsule the round reached. The round still has to land on a damageable part of that animal: a mark aimed beside it does not become a headshot, and a click that lands on the chest stays a chest mark. Grouse and rabbits are excluded (any hit already kills them).
 - While the mode is up — marking or the execution — the left and right mouse buttons and the reload key (R) do nothing: the mod owns the weapon for the duration, and firing, aiming or reloading mid-sequence would fight its own look-at glides and pacing. Movement, the camera, and every other key are unaffected, and the mode's own keys keep working.
 - Fatigue drains a configurable percentage of the full bar per real-time second (default 1%, ~100 s from full), and returns to normal the moment it ends — if you run out of stamina mid-mode, it shuts off by itself, and a fully exhausted survivor cannot enter the mode at all.
 - Footsteps go quiet for as long as you are marking: entering the mode mid-stride no longer leaves the step sounds running under the slow motion. Normal sound returns the moment the mode ends; footprints and splashes are untouched.
@@ -93,7 +93,7 @@ Nine tuning values are **compiled into the release build** and deliberately abse
 | Tracking strength | 0.5 | How hard an in-flight round turns toward its mark |
 | Small-prey aim point | 0.7 | How deep inside a grouse / rabbit the shot converges (0 = feet, 1 = body centre) |
 | Near-miss radius | 0.6 m | A round passing this close to a damage collider counts as a hit |
-| Head-mark radius | 0.35 m | How close the crosshair must pass to a large animal's head for the mark to count as a head mark |
+| Head-mark radius | 0.35 m | How close a click that hit NO collider must pass to a large animal's head to count as a head mark; a click that hit a capsule is decided by that capsule's identity instead |
 | Mark fallback radius | 1.2 m | How far the crosshair ray may miss an animal's body and still mark it — this is what catches a howling wolf's head, which sticks out above its collision capsule; 0 turns the fallback off |
 | Execution time scale | 0.2 | World speed during the execution |
 | Execution fire rate | 1.5x | How much faster than normal shooting the sequence fires |
@@ -156,7 +156,7 @@ You may use, modify and redistribute Dead Eye, including shipping the unmodified
 
 - 再按一次鼠标后侧键——**结束标记环节，直接进入处决**：黄色滤镜与时间放慢一直持续到处决结束（若一个都没标，同一按键则立刻结束死神之眼）。左轮在进入标记时就已经拔出。视角通过游戏自带的过场演出视角系统先甩向第一个标记；准星到位后立刻以武器原生满射速逐个开火，视角在目标之间如「甩枪」般连续平滑掠过——甩动节奏与射速匹配。**放慢只作用于世界：人物自身的拔枪、开火动作与射速都以正常速率进行。**
 - 每发弹丸在出膛瞬间被重定向到**提前量拦截点**——根据动物当前移动速度与左轮出膛速度（含重力下坠）计算「子弹到达时它会在哪」——所以奔跑中的目标也能标头打头、标身打身。游戏自己的伤害、失血、要害判定和技能经验全部原样生效；装了自适应兵工厂时，子弹还会在飞行途中持续修正方向追着它走——追的是「它将要到的地方」而不是「它刚才在的地方」，并且出膛第一帧就抹掉枪口误差——提前量稍有偏差也能命中。松鸡和兔子是例外：无论你标的是哪个部位，标记都取在它的**可伤害身体**上（子弹朝那个胶囊收束）——这么小的目标挨一发就死，而瞄准点如果贴在它可见的表面上，任何偏差都有一半落在身体之外。由于这些碰撞胶囊比模型大好几倍，准星没有真正落在身体上时会**拒绝标记**（容差按动物体型缩放，不是固定距离），而不是把标记点飘到鸟的上方半米处。收进多少由内置的瞄准深度决定（调试版里对应「小体型瞄准点」滑条）。此外，子弹时间不会在最后一枪扣下时就结束——处决效果会一直维持到最后一发子弹消失（命中目标、打在环境上、或自行飞完超时），之后时间才恢复正常。子弹本身也会按世界放慢的倍数加速，所以它划过那段距离的观感接近正常射击，而不是慢吞吞地爬；加速有上限，取命中判定还能跟得上的速度。
-- **标在头上的标记，会让这次处决的每一发都按头部结算。** 只要一个标记被判定为头部标记，之后任何一发只要打中这只动物，伤害倍率、失血时间与爆头暴击掷骰都取头部那一行，受击反应也播在头上——不管子弹实际碰到的是哪个胶囊。子弹仍然必须真正打中一个可伤害部位：准星偏在动物旁边的标记不会变成爆头。松鸡、兔子不适用（挨一发就死）。
+- **标在头上的标记，会让这次处决的每一发都按头部结算——而且子弹会真的瞄向头部。** 只要一个标记被判定为头部标记，标记点就落在头部中心、每一发都追着它飞；如果那一刻头部的伤害胶囊打不到（狼仰头嚎叫时会被关掉），子弹改为瞄向身体、保证照样命中，伤害倍率、失血时间与爆头暴击掷骰仍然取头部那一行，受击反应也播在头上——不管子弹实际碰到的是哪个胶囊。子弹仍然必须真正打中一个可伤害部位：准星偏在动物旁边的标记不会变成爆头，而落在胸口上的那一下就是胸口标记。松鸡、兔子不适用（挨一发就死）。
 - 模式开启期间——标记或处决——鼠标左键、右键与换弹键（R）全部无效：这把枪整个期间由 mod 接管，中途手动开火、瞄准或换弹都会和它自己的甩枪视角与射击节奏打架。移动、视角和其余按键不受影响，模式自己的几个键也照常可用。
 - 标记期间疲劳按真实时间每秒消耗总量的一定百分比（默认 1%，满疲劳约 100 秒耗空），结束立刻恢复——中途力竭会自动收招，完全力竭时根本进不了模式。
 - 标记期间脚步声静音：走过去随手开启死神之眼，不会再听到慢动作里还在响的脚步。模式一结束声音立刻恢复，脚印与水花不受影响。
@@ -219,7 +219,7 @@ You may use, modify and redistribute Dead Eye, including shipping the unmodified
 | 追踪强度 | 0.5 | 飞行中的子弹咬住标记的力度 |
 | 小体型瞄准点 | 0.7 | 打到松鸡 / 兔子体内多深（0 = 脚下，1 = 身体胶囊中心） |
 | 近失补偿半径 | 0.6 米 | 弹道擦到伤害碰撞体这个距离内即算命中 |
-| 头部标记判定半径 | 0.35 米 | 准星离大型动物头部多近，这次标记才算头部标记 |
+| 头部标记判定半径 | 0.35 米 | 只对「一个碰撞体都没碰到」的点击生效：射线离大型动物头部多近才算头部标记；打中胶囊的点击改由胶囊本身判定 |
 | 标记回退半径 | 1.2 米 | 准星射线擦过动物身体多远之内仍算「瞄着它」——专门用来救仰头嚎叫的狼（头部伸出碰撞胶囊之外）这类情况；0 = 关闭回退 |
 | 处决时间流速 | 0.2 | 处决期间的世界流速 |
 | 处决射速倍率 | 1.5 倍 | 处决序列比平时射击快多少 |

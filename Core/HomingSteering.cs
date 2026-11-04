@@ -43,6 +43,7 @@ internal static class HomingSteering
         internal bool SmallPrey;
         internal LocalizedDamage? HeadPart; // set for a HEAD mark: the row every hit reads
         internal Vector3 HeadLocal;         // head centre in that capsule's local space
+        internal bool AimAtHead;            // this round chases the head, not the body point
         internal float LaunchSpeed;      // world speed this round must fly at (slow-motion compensated)
         internal bool Resolved;          // the hit was applied by this mod; the round is torn down
         internal string ResolutionReason = "resolved on hit"; // report label: hit vs scenery
@@ -89,7 +90,8 @@ internal static class HomingSteering
 
     internal static void Register(Rigidbody body, GameObject target, Vector3 bodyOffset, bool smallPrey,
                                   Vector3 targetVelocity, float launchSpeed,
-                                  LocalizedDamage? headPart = null, Vector3 headLocal = default)
+                                  LocalizedDamage? headPart = null, Vector3 headLocal = default,
+                                  bool aimAtHead = false)
     {
         float now = Time.unscaledTime;
         var entry = new Entry
@@ -107,6 +109,7 @@ internal static class HomingSteering
             SmallPrey = smallPrey,
             HeadPart = headPart,
             HeadLocal = headLocal,
+            AimAtHead = aimAtHead && headPart != null,
             LaunchSpeed = launchSpeed,
             CreatedAt = now,
             ExpiresAt = now + LifetimeSeconds,
@@ -586,13 +589,18 @@ internal static class HomingSteering
     /// <summary>
     /// The body point the shot is being described by, resolved from the animal's CURRENT
     /// root — one place, so the flight steering and the impact bookkeeping cannot disagree.
+    /// A round aimed at a HEAD mark chases the head centre itself instead of the height band:
+    /// the head is a specific capsule, not a slice of the body cylinder, and the head point
+    /// lives in that capsule's local space, so it stays correct when the animal turns.
     /// </summary>
     private static Vector3 BodyPointOf(Entry entry)
     {
         Vector3 root = entry.Target.transform.position;
-        return entry.SmallPrey
-            ? AnimalBody.PreyAimPoint(root, entry.BodyOffset)
-            : root + Vector3.up * entry.AimHeight;
+        if (entry.SmallPrey)
+            return AnimalBody.PreyAimPoint(root, entry.BodyOffset);
+
+        Vector3 bodyPoint = root + Vector3.up * entry.AimHeight;
+        return entry.AimAtHead ? HeadPointOf(entry, bodyPoint) : bodyPoint;
     }
 
     /// <summary>

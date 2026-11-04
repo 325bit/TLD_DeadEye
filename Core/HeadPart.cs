@@ -12,17 +12,19 @@ namespace DeadEye.Core;
 /// otherwise roll the chest row of the damage table. A mark that qualifies here makes every
 /// round that HITS the animal read the head row instead (damage scale, bleed-out minutes and
 /// the critical-hit roll), and play its hit animation at the head.
-/// This class only IDENTIFIES the head and its damage table. It never moves the mark, never
-/// picks the aim point and never decides whether a round hit — the shot's own geometry still
-/// has to land on a damageable capsule.
+/// This class only IDENTIFIES the head, its damage table and the capsule it lives on. It never
+/// moves the mark, never picks the aim point and never decides whether a round hit — the shot's
+/// own geometry still has to land on a damageable capsule.
 /// </summary>
 internal static class HeadPart
 {
     /// <summary>
-    /// How far the crosshair ray may pass from the head and still count as aimed at it. The
-    /// head capsule measures about 0.50 x 0.46 x 0.34 m (half-extents ~0.25 / 0.23 / 0.17) and
-    /// the chest centre sits more than half a metre lower, so 0.35 m covers "crosshair on the
-    /// head, edge included" while leaving a deliberate chest mark a chest mark.
+    /// How far the crosshair ray may pass from the head and still count as aimed at it. This
+    /// test runs ONLY for a click that hit no capsule at all (see <see cref="TryFind"/>): the
+    /// howling wolf raises its head above every collider, so there is no surface to identify.
+    /// A click that DID hit a capsule is named by that collider's identity instead, because on
+    /// a standing animal the head box and the chest capsule overlap in height and a radius
+    /// that reaches the head also reaches an upper-chest aim.
     /// </summary>
     private const float RayRadius = 0.35f;
 
@@ -31,15 +33,21 @@ internal static class HeadPart
 
     /// <summary>
     /// The animal's head damage table when the click counts as a head mark, else false.
-    /// A mark qualifies when the crosshair ray passes within <see cref="RayRadius"/> of the head
-    /// box, which is the same test whether the ray grazed the head capsule's surface or missed
-    /// every collider on the animal — the howling wolf, whose raised head sits ABOVE all of them.
-    /// <paramref name="centre"/> is the head centre in world space, used for the hit animation.
+    /// <paramref name="surfaceHit"/> is the collider the click landed on, or null when the ray
+    /// hit no solid part of this animal at all:
+    /// a surface hit decides by COLLIDER IDENTITY (that capsule carries the head row or the
+    /// click was not aimed at the head), a null decides by distance from the ray to the head
+    /// box — the howling wolf, whose raised head sits ABOVE all of them.
+    /// <paramref name="centre"/> is the head centre in world space, used for the hit animation
+    /// and as the mark's aim point; <paramref name="headCollider"/> is the capsule it came from,
+    /// so the mark can tell whether a round can still reach it.
     /// </summary>
-    internal static bool TryFind(BaseAi? ai, Ray ray, out LocalizedDamage? head, out Vector3 centre)
+    internal static bool TryFind(BaseAi? ai, Ray ray, Collider? surfaceHit,
+                                 out LocalizedDamage? head, out Vector3 centre, out Collider? headCollider)
     {
         head = null;
         centre = default;
+        headCollider = null;
 
         if (ai == null)
             return false;
@@ -48,6 +56,31 @@ internal static class HeadPart
         // row would only replace a table that is not what decides the outcome.
         if (AnimalBody.IsSmallPrey(ai))
             return false;
+
+        // A click that landed on one of the animal's own capsules names the part by identity:
+        // the crosshair was ON that surface, so a chest contact is a chest mark whatever the
+        // head box does at that moment. No radius, no room to drift.
+        if (surfaceHit != null)
+        {
+            LocalizedDamage? direct = ReadHeadPart(surfaceHit);
+            if (direct == null)
+                return false;
+
+            Bounds hitBounds;
+            try
+            {
+                hitBounds = surfaceHit.bounds;
+            }
+            catch (System.Exception)
+            {
+                return false;
+            }
+
+            head = direct;
+            headCollider = surfaceHit;
+            centre = CentreOf(surfaceHit, hitBounds);
+            return true;
+        }
 
         Collider[]? set = AnimalBody.CollectFor(ai, null);
         if (set == null || set.Length == 0)
@@ -107,6 +140,7 @@ internal static class HeadPart
 
         centre = CentreOf(bestCollider, bestBounds);
         head = bestHead;
+        headCollider = bestCollider;
         return true;
     }
 

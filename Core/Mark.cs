@@ -20,6 +20,7 @@ internal sealed class Mark
     private readonly bool _smallPrey;
     private readonly LocalizedDamage? _headPart;
     private readonly Vector3 _headLocal;
+    private readonly Collider? _headCollider;
     private float _velocityUnscaled;
 
     internal Vector3 Velocity { get; private set; }
@@ -30,7 +31,8 @@ internal sealed class Mark
     /// <summary>GAME time (scaled) the sample in <see cref="Velocity"/> was taken at.</summary>
     internal float VelocityGameTime { get; private set; }
 
-    internal Mark(BaseAi ai, Vector3 worldPoint, LocalizedDamage? headPart = null, Vector3? headCentre = null)
+    internal Mark(BaseAi ai, Vector3 worldPoint, LocalizedDamage? headPart = null, Vector3? headCentre = null,
+                  Collider? headCollider = null)
     {
         _ai = ai;
         _bodyOffset = worldPoint - ai.transform.position;
@@ -41,6 +43,7 @@ internal sealed class Mark
         // is only used for the hit animation, and a howling / turning wolf moves its head a
         // third of a metre while the root stays put.
         _headPart = headPart;
+        _headCollider = headCollider;
         if (headPart != null && headCentre.HasValue)
         {
             try
@@ -51,6 +54,14 @@ internal sealed class Mark
             {
                 _headPart = null;
             }
+
+            // The BALLISTIC fallback of a head mark must be a torso point, not the head point
+            // the click resolved: a mark placed on the head carries the head as its mark point,
+            // and aiming at a capsule the game switched off is the empty shot the fallback is
+            // there to prevent. Clamped into the body band and built on world up, so a turn
+            // cannot sweep it sideways (same rule the steering uses, §10 #41).
+            if (_headPart != null)
+                _bodyOffset = Vector3.up * AnimalBody.LargeAimHeight(headCentre.Value - ai.transform.position);
         }
     }
 
@@ -79,6 +90,40 @@ internal sealed class Mark
     internal Vector3 HeadLocal => _headLocal;
 
     /// <summary>
+    /// Whether a round can still reach the head capsule this mark was placed on. The game
+    /// disables the damage capsules while a wolf howls with its head raised above them, so a
+    /// head mark can outlive the thing it names — that is the state the ballistic fallback is
+    /// for. Read LIVE: the capsules come back on their own a moment later.
+    /// </summary>
+    internal bool HeadHittable
+    {
+        get
+        {
+            if (_headPart == null || _headCollider == null)
+                return false;
+
+            try
+            {
+                return _headCollider.enabled
+                       && !_headCollider.isTrigger
+                       && _headCollider.gameObject != null
+                       && _headCollider.gameObject.activeInHierarchy;
+            }
+            catch (System.Exception)
+            {
+                return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Where this shot is AIMED: the head, unless the head capsule cannot be hit right now —
+    /// then the marked body point, which is what keeps a howling-wolf shot on the animal. The
+    /// damage row is the head row either way (see <see cref="HeadPart"/>).
+    /// </summary>
+    internal bool AimAtHead => !_smallPrey && HeadHittable && TryGetHeadPoint(out Vector3 _);
+
+    /// <summary>
     /// Current world position of the head centre this mark was placed on. Resolved live from
     /// the head capsule's transform, so the hit animation plays where the head is NOW rather
     /// than where it was when the trigger was pulled.
@@ -102,6 +147,11 @@ internal sealed class Mark
 
     internal bool IsAlive => _ai != null && _ai.gameObject != null && _ai.GetAiMode() != AiMode.Dead;
 
+    /// <summary>
+    /// Where the marker X is drawn: the head centre for a head mark, the marked body point
+    /// otherwise. Positional only — it says what the player aimed at, not where the round will
+    /// land, so a head mark whose capsule is unusable still shows on the head.
+    /// </summary>
     internal bool TryGetWorldPoint(out Vector3 worldPoint)
     {
         if (!IsAlive)
@@ -109,6 +159,8 @@ internal sealed class Mark
             worldPoint = default;
             return false;
         }
+        if (TryGetHeadPoint(out worldPoint))
+            return true;
         worldPoint = _ai.transform.position + _bodyOffset;
         return true;
     }
@@ -117,6 +169,9 @@ internal sealed class Mark
     /// World point the shot should converge on. Small prey resolves INSIDE its body (see
     /// <see cref="AnimalBody.PreyAimPoint"/>) because a body that thin cannot absorb an aim
     /// point sitting on the surface; everything else uses the marked point itself.
+    /// A head mark converges on the head while the head capsule is reachable, and drops back to
+    /// the marked body point when it is not — a round aimed at a capsule that is switched off
+    /// would fly clean over the animal.
     /// </summary>
     internal bool TryGetAimPoint(out Vector3 worldPoint)
     {
@@ -125,6 +180,9 @@ internal sealed class Mark
             worldPoint = default;
             return false;
         }
+
+        if (AimAtHead && TryGetHeadPoint(out worldPoint))
+            return true;
 
         worldPoint = _smallPrey
             ? AnimalBody.PreyAimPoint(_ai.transform.position, _bodyOffset)
